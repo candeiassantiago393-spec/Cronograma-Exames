@@ -9,9 +9,12 @@
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
   ];
 
-  const DISCIPLINES = Object.keys(DATA.disciplineLabels);
+  const BUILTIN_IDS = ["FIS", "MAT", "PORT", "QUI", "FQ", "PREP", "DESC"];
   const TYPES = Object.keys(DATA.typeLabels);
-  const FILTERABLE = ["FIS", "MAT", "PORT", "QUI", "FQ", "PREP", "DESC"];
+  const SUBJECT_COLORS = [
+    "#b45309", "#7c3aed", "#be185d", "#0369a1", "#15803d",
+    "#c2410c", "#0f766e", "#4338ca", "#a16207", "#334155",
+  ];
 
   let state = loadState();
   let viewMode = "month"; // month | week
@@ -21,9 +24,10 @@
   let selectedDate = null;
   let editingTaskId = null;
   let activeTab = "calendar";
-  let discFilter = new Set(FILTERABLE); // all on
+  let discFilter = new Set(allDisciplineIds());
   let iaveSubjectFilter = "ALL";
   let dragTaskId = null;
+  let selectedSubjectColor = SUBJECT_COLORS[0];
 
   const els = {
     monthLabel: document.getElementById("month-label"),
@@ -49,7 +53,45 @@
     iaveList: document.getElementById("iave-list"),
     iaveFilters: document.getElementById("iave-filters"),
     iaveProgress: document.getElementById("iave-progress"),
+    subjectModal: document.getElementById("subject-modal"),
+    subjectForm: document.getElementById("subject-form"),
+    subjectList: document.getElementById("subject-list"),
+    colorSwatches: document.getElementById("color-swatches"),
   };
+
+  function allDisciplineIds() {
+    const custom = (state?.customSubjects || []).map((s) => s.id);
+    return [...BUILTIN_IDS, ...custom];
+  }
+
+  function disciplineLabel(id) {
+    if (DATA.disciplineLabels[id]) return DATA.disciplineLabels[id];
+    const custom = (state.customSubjects || []).find((s) => s.id === id);
+    return custom?.label || id;
+  }
+
+  function disciplineColor(id) {
+    const builtin = {
+      FIS: "#0b6bcb",
+      MAT: "#0f7a45",
+      PORT: "#c2410c",
+      QUI: "#0f766e",
+      FQ: "#334155",
+      PREP: "#57534e",
+      DESC: "#64748b",
+    };
+    if (builtin[id]) return builtin[id];
+    const custom = (state.customSubjects || []).find((s) => s.id === id);
+    return custom?.color || "#57534e";
+  }
+
+  function discClass(id) {
+    return BUILTIN_IDS.includes(id) ? `disc-${id}` : "chip-custom";
+  }
+
+  function discInlineStyle(id) {
+    return BUILTIN_IDS.includes(id) ? "" : `background:${disciplineColor(id)}`;
+  }
 
   function parseISO(iso) {
     const [y, m, d] = iso.split("-").map(Number);
@@ -109,6 +151,7 @@
       errors: [],
       simScores: {},
       iaveDone: {},
+      customSubjects: [],
     };
   }
 
@@ -128,6 +171,7 @@
         errors: parsed.errors || [],
         simScores: parsed.simScores || {},
         iaveDone: parsed.iaveDone || {},
+        customSubjects: parsed.customSubjects || [],
       };
     } catch {
       return { tasksByDate: buildDefaultTasks(), done: {}, ...emptyStateExtras() };
@@ -143,6 +187,7 @@
         errors: state.errors,
         simScores: state.simScores,
         iaveDone: state.iaveDone,
+        customSubjects: state.customSubjects || [],
       }),
     );
   }
@@ -188,7 +233,10 @@
   }
 
   function shortLabel(task) {
-    return `${task.discipline}: ${task.title}`;
+    const prefix = BUILTIN_IDS.includes(task.discipline)
+      ? task.discipline
+      : disciplineLabel(task.discipline);
+    return `${prefix}: ${task.title}`;
   }
 
   function findDateOfTask(id) {
@@ -232,30 +280,33 @@
 
   /* ——— Legend / filters ——— */
   function renderLegend() {
+    const ids = allDisciplineIds();
     els.legend.innerHTML = "";
     const allBtn = document.createElement("button");
     allBtn.type = "button";
-    allBtn.className = `legend-chip filter-chip${discFilter.size === FILTERABLE.length ? " active" : ""}`;
+    allBtn.className = `legend-chip filter-chip${discFilter.size === ids.length ? " active" : ""}`;
     allBtn.textContent = "Todas";
     allBtn.addEventListener("click", () => {
-      discFilter = new Set(FILTERABLE);
+      discFilter = new Set(allDisciplineIds());
       renderAll();
       if (selectedDate) openDay(selectedDate);
     });
     els.legend.appendChild(allBtn);
 
-    for (const d of FILTERABLE) {
+    for (const d of ids) {
       const chip = document.createElement("button");
       chip.type = "button";
       const on = discFilter.has(d);
       chip.className = `legend-chip filter-chip${on ? " active" : " dim"}`;
-      chip.innerHTML = `<span class="legend-dot disc-${d}"></span>${DATA.disciplineLabels[d]}`;
+      const style = discInlineStyle(d);
+      chip.innerHTML = `<span class="legend-dot ${discClass(d)}" style="${style}"></span>${escapeHtml(disciplineLabel(d))}`;
       chip.addEventListener("click", () => {
-        if (discFilter.size === FILTERABLE.length) {
+        const all = allDisciplineIds();
+        if (discFilter.size === all.length) {
           discFilter = new Set([d]);
         } else if (discFilter.has(d)) {
           discFilter.delete(d);
-          if (discFilter.size === 0) discFilter = new Set(FILTERABLE);
+          if (discFilter.size === 0) discFilter = new Set(all);
         } else {
           discFilter.add(d);
         }
@@ -304,7 +355,9 @@
   function makeChipEl(task) {
     const done = !!state.done[task.id];
     const el = document.createElement("div");
-    el.className = `chip disc-${task.discipline}${done ? " done" : ""}`;
+    el.className = `chip ${discClass(task.discipline)}${done ? " done" : ""}`;
+    const style = discInlineStyle(task.discipline);
+    if (style) el.setAttribute("style", style);
     el.draggable = true;
     el.title = `${task.title} (arrasta para outro dia)`;
     el.textContent = shortLabel(task);
@@ -459,7 +512,7 @@
         <div>
           <h4>${escapeHtml(task.title)}</h4>
           <div class="task-meta">
-            <span class="tag disc-${task.discipline}" style="color:#fff">${escapeHtml(DATA.disciplineLabels[task.discipline] || task.discipline)}</span>
+            <span class="tag ${discClass(task.discipline)}" style="color:#fff;${discInlineStyle(task.discipline)}">${escapeHtml(disciplineLabel(task.discipline))}</span>
             <span class="tag type">${escapeHtml(DATA.typeLabels[task.type] || task.type)}</span>
             ${task.duration ? `<span class="duration">${escapeHtml(task.duration)}</span>` : ""}
           </div>
@@ -484,11 +537,14 @@
 
   /* ——— Task modal ——— */
   function fillSelects() {
+    const ids = allDisciplineIds();
     for (const form of [els.form, els.errorForm]) {
       const disc = form.elements.discipline;
-      disc.innerHTML = DISCIPLINES.map(
-        (d) => `<option value="${d}">${DATA.disciplineLabels[d]}</option>`,
+      const current = disc.value;
+      disc.innerHTML = ids.map(
+        (d) => `<option value="${d}">${escapeHtml(disciplineLabel(d))}</option>`,
       ).join("");
+      if (ids.includes(current)) disc.value = current;
     }
     els.form.elements.type.innerHTML = TYPES.map(
       (t) => `<option value="${t}">${DATA.typeLabels[t]}</option>`,
@@ -595,7 +651,7 @@
       card.className = "tool-card";
       card.innerHTML = `
         <div class="tool-card-top">
-          <span class="tag disc-${err.discipline}" style="color:#fff">${escapeHtml(DATA.disciplineLabels[err.discipline] || err.discipline)}</span>
+          <span class="tag ${discClass(err.discipline)}" style="color:#fff;${discInlineStyle(err.discipline)}">${escapeHtml(disciplineLabel(err.discipline))}</span>
           <span class="duration">${escapeHtml(err.date)}</span>
         </div>
         <h3>${escapeHtml(err.topic)}</h3>
@@ -735,6 +791,99 @@
   }
 
   /* ——— Tabs / nav ——— */
+  function renderSubjectSwatches() {
+    els.colorSwatches.innerHTML = "";
+    for (const color of SUBJECT_COLORS) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `color-swatch${selectedSubjectColor === color ? " selected" : ""}`;
+      btn.style.background = color;
+      btn.setAttribute("aria-label", color);
+      btn.addEventListener("click", () => {
+        selectedSubjectColor = color;
+        els.subjectForm.elements.color.value = color;
+        renderSubjectSwatches();
+      });
+      els.colorSwatches.appendChild(btn);
+    }
+    els.subjectForm.elements.color.value = selectedSubjectColor;
+  }
+
+  function renderSubjectList() {
+    const list = els.subjectList;
+    list.innerHTML = "";
+    const customs = state.customSubjects || [];
+    if (!customs.length) {
+      list.innerHTML = `<p class="empty-hint">Ainda não criaste matérias. Exemplos: Mat-aulas, Port-aulas, Bio-aulas.</p>`;
+      return;
+    }
+    for (const sub of customs) {
+      const row = document.createElement("div");
+      row.className = "subject-row";
+      row.innerHTML = `
+        <div class="subject-row-left">
+          <span class="legend-dot chip-custom" style="background:${sub.color}"></span>
+          ${escapeHtml(sub.label)}
+        </div>
+        <button type="button" class="btn danger ghost small" data-del>Apagar</button>
+      `;
+      row.querySelector("[data-del]").addEventListener("click", () => {
+        const used = Object.values(state.tasksByDate).some((tasks) =>
+          tasks.some((t) => t.discipline === sub.id),
+        );
+        const msg = used
+          ? `Apagar “${sub.label}”? As tarefas existentes passam para Preparação.`
+          : `Apagar “${sub.label}”?`;
+        if (!confirm(msg)) return;
+        if (used) {
+          for (const iso of Object.keys(state.tasksByDate)) {
+            for (const t of state.tasksByDate[iso]) {
+              if (t.discipline === sub.id) t.discipline = "PREP";
+            }
+          }
+        }
+        state.customSubjects = state.customSubjects.filter((s) => s.id !== sub.id);
+        discFilter.delete(sub.id);
+        if (discFilter.size === 0) discFilter = new Set(allDisciplineIds());
+        saveState();
+        fillSelects();
+        renderSubjectList();
+        renderAll();
+      });
+      list.appendChild(row);
+    }
+  }
+
+  function openSubjectModal() {
+    els.subjectForm.elements.label.value = "";
+    selectedSubjectColor = SUBJECT_COLORS[Math.floor(Math.random() * SUBJECT_COLORS.length)];
+    renderSubjectSwatches();
+    renderSubjectList();
+    els.subjectModal.showModal();
+  }
+
+  function saveSubjectFromForm() {
+    const label = els.subjectForm.elements.label.value.trim();
+    if (!label) return;
+    const color = els.subjectForm.elements.color.value || selectedSubjectColor;
+    const exists = (state.customSubjects || []).some(
+      (s) => s.label.toLowerCase() === label.toLowerCase(),
+    );
+    if (exists) {
+      alert("Já existe uma matéria com esse nome.");
+      return;
+    }
+    const id = uid("mat");
+    if (!state.customSubjects) state.customSubjects = [];
+    state.customSubjects.push({ id, label, color });
+    discFilter.add(id);
+    saveState();
+    fillSelects();
+    els.subjectForm.elements.label.value = "";
+    renderSubjectList();
+    renderAll();
+  }
+
   function switchTab(tab) {
     activeTab = tab;
     document.querySelectorAll(".tab").forEach((b) => {
@@ -745,6 +894,8 @@
     document.getElementById("panel-sims").classList.toggle("hidden", tab !== "sims");
     document.getElementById("panel-iave").classList.toggle("hidden", tab !== "iave");
     els.legend.classList.toggle("hidden", tab !== "calendar");
+    document.querySelector(".legend-row")?.classList.toggle("hidden", tab !== "calendar");
+    document.getElementById("btn-manage-subjects")?.classList.toggle("hidden", tab !== "calendar");
     if (tab === "errors") renderErrors();
     if (tab === "sims") renderSims();
     if (tab === "iave") renderIave();
@@ -840,6 +991,7 @@
     });
     document.getElementById("btn-add-task").addEventListener("click", () => openModal(null));
     document.getElementById("btn-add-error").addEventListener("click", () => openErrorModal(null));
+    document.getElementById("btn-manage-subjects").addEventListener("click", openSubjectModal);
 
     els.btnDelete.addEventListener("click", () => {
       if (!editingTaskId) return;
@@ -860,6 +1012,11 @@
       e.preventDefault();
       saveErrorFromForm();
       els.errorModal.close();
+    });
+    els.subjectForm.addEventListener("submit", (e) => {
+      if (e.submitter && e.submitter.value === "cancel") return;
+      e.preventDefault();
+      saveSubjectFromForm();
     });
   }
 

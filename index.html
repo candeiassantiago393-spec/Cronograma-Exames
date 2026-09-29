@@ -41,7 +41,10 @@
       <button type="button" class="tab" data-tab="iave">Exames IAVE</button>
     </nav>
 
-    <div class="legend" id="legend"></div>
+    <div class="legend-row">
+      <div class="legend" id="legend"></div>
+      <button type="button" class="btn ghost small" id="btn-manage-subjects">+ Matéria</button>
+    </div>
 
     <section class="tab-panel" id="panel-calendar">
       <main class="layout">
@@ -184,6 +187,35 @@
         </div>
       </div>
     </form>
+  </dialog>
+
+  <dialog class="modal" id="subject-modal">
+    <form method="dialog" id="subject-form">
+      <div class="modal-head">
+        <h3>Matérias personalizadas</h3>
+        <button type="submit" value="cancel" formnovalidate class="icon-btn modal-close" aria-label="Fechar">×</button>
+      </div>
+      <p class="modal-hint">Cria matérias da escola (ex.: Mat-aulas, Port-aulas, Bio-aulas) para usar no calendário.</p>
+      <label>Nome
+        <input type="text" name="label" required maxlength="40" placeholder="ex: Mat-aulas" />
+      </label>
+      <fieldset class="color-fieldset">
+        <legend>Cor</legend>
+        <div class="color-swatches" id="color-swatches"></div>
+        <input type="hidden" name="color" value="#b45309" />
+      </fieldset>
+      <div class="modal-actions">
+        <span></span>
+        <div class="modal-actions-right">
+          <button type="submit" value="cancel" formnovalidate class="btn ghost">Fechar</button>
+          <button type="submit" value="save" class="btn primary">Adicionar</button>
+        </div>
+      </div>
+    </form>
+    <div class="subject-list-wrap">
+      <h4>As tuas matérias</h4>
+      <div id="subject-list" class="subject-list"></div>
+    </div>
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
