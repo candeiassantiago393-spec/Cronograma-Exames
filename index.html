@@ -116,7 +116,10 @@
 
   <dialog class="modal" id="task-modal">
     <form method="dialog" id="task-form">
-      <h3 id="modal-title">Editar tarefa</h3>
+      <div class="modal-head">
+        <h3 id="modal-title">Editar tarefa</h3>
+        <button type="submit" value="cancel" class="icon-btn modal-close" aria-label="Fechar">×</button>
+      </div>
       <label>Título
         <input type="text" name="title" required maxlength="200" />
       </label>
@@ -151,7 +154,10 @@
 
   <dialog class="modal" id="error-modal">
     <form method="dialog" id="error-form">
-      <h3>Registar erro</h3>
+      <div class="modal-head">
+        <h3>Registar erro</h3>
+        <button type="submit" value="cancel" class="icon-btn modal-close" aria-label="Fechar">×</button>
+      </div>
       <div class="form-row">
         <label>Disciplina
           <select name="discipline"></select>

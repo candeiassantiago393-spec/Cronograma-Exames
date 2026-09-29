@@ -240,6 +240,17 @@ body {
   display: flex; flex-direction: column; gap: 12px; padding: 20px;
 }
 .modal h3 { margin: 0; font-family: var(--font-display); }
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.modal-close {
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
 .modal label {
   display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; font-weight: 500;
 }
