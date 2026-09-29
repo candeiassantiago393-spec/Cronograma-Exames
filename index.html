@@ -118,7 +118,7 @@
     <form method="dialog" id="task-form">
       <div class="modal-head">
         <h3 id="modal-title">Editar tarefa</h3>
-        <button type="submit" value="cancel" class="icon-btn modal-close" aria-label="Fechar">×</button>
+        <button type="submit" value="cancel" formnovalidate class="icon-btn modal-close" aria-label="Fechar">×</button>
       </div>
       <label>Título
         <input type="text" name="title" required maxlength="200" />
@@ -145,7 +145,7 @@
       <div class="modal-actions">
         <button type="button" class="btn danger ghost" id="btn-delete-task">Apagar</button>
         <div class="modal-actions-right">
-          <button type="submit" value="cancel" class="btn ghost">Cancelar</button>
+          <button type="submit" value="cancel" formnovalidate class="btn ghost">Cancelar</button>
           <button type="submit" value="save" class="btn primary">Guardar</button>
         </div>
       </div>
@@ -156,7 +156,7 @@
     <form method="dialog" id="error-form">
       <div class="modal-head">
         <h3>Registar erro</h3>
-        <button type="submit" value="cancel" class="icon-btn modal-close" aria-label="Fechar">×</button>
+        <button type="submit" value="cancel" formnovalidate class="icon-btn modal-close" aria-label="Fechar">×</button>
       </div>
       <div class="form-row">
         <label>Disciplina
@@ -179,7 +179,7 @@
       <div class="modal-actions">
         <span></span>
         <div class="modal-actions-right">
-          <button type="submit" value="cancel" class="btn ghost">Cancelar</button>
+          <button type="submit" value="cancel" formnovalidate class="btn ghost">Cancelar</button>
           <button type="submit" value="save" class="btn primary">Guardar</button>
         </div>
       </div>
