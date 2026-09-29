@@ -1,6 +1,8 @@
 (() => {
   const DATA = window.CRONOGRAMA_DATA;
-  const STORAGE_KEY = "cronograma-exames-v1";
+  const IAVE = window.IAVE_EXAMS || [];
+  const SIMS = window.SIMULACRO_SLOTS || [];
+  const STORAGE_KEY = "cronograma-exames-v2";
   const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
   const MONTHS = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -9,13 +11,19 @@
 
   const DISCIPLINES = Object.keys(DATA.disciplineLabels);
   const TYPES = Object.keys(DATA.typeLabels);
+  const FILTERABLE = ["FIS", "MAT", "PORT", "QUI", "FQ", "PREP", "DESC"];
 
-  /** @type {{ tasksByDate: Record<string, any[]>, done: Record<string, boolean> }} */
   let state = loadState();
+  let viewMode = "month"; // month | week
   let viewYear = 2026;
-  let viewMonth = 9; // October
+  let viewMonth = 9;
+  let weekAnchor = parseISO("2026-10-05");
   let selectedDate = null;
   let editingTaskId = null;
+  let activeTab = "calendar";
+  let discFilter = new Set(FILTERABLE); // all on
+  let iaveSubjectFilter = "ALL";
+  let dragTaskId = null;
 
   const els = {
     monthLabel: document.getElementById("month-label"),
@@ -26,12 +34,21 @@
     sideContent: document.getElementById("side-content"),
     sideWeek: document.getElementById("side-week"),
     sideDate: document.getElementById("side-date"),
+    sideProgress: document.getElementById("side-progress"),
     taskList: document.getElementById("task-list"),
     modal: document.getElementById("task-modal"),
     form: document.getElementById("task-form"),
     modalTitle: document.getElementById("modal-title"),
     btnDelete: document.getElementById("btn-delete-task"),
     exportRoot: document.getElementById("calendar-export-root"),
+    errorModal: document.getElementById("error-modal"),
+    errorForm: document.getElementById("error-form"),
+    errorsList: document.getElementById("errors-list"),
+    simsList: document.getElementById("sims-list"),
+    simsChart: document.getElementById("sims-chart"),
+    iaveList: document.getElementById("iave-list"),
+    iaveFilters: document.getElementById("iave-filters"),
+    iaveProgress: document.getElementById("iave-progress"),
   };
 
   function parseISO(iso) {
@@ -52,21 +69,24 @@
     return d;
   }
 
+  function startOfWeek(date) {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dow = (d.getDay() + 6) % 7;
+    return addDays(d, -dow);
+  }
+
   function uid(prefix = "t") {
     return `${prefix}_${Math.random().toString(36).slice(2, 9)}_${Date.now().toString(36)}`;
   }
 
   function buildDefaultTasks() {
-    /** @type {Record<string, any[]>} */
     const map = {};
-
     for (const prep of DATA.prepDays) {
       map[prep.date] = prep.tasks.map((task, i) => ({
         ...task,
         id: `prep_${prep.date}_${i}`,
       }));
     }
-
     const start = parseISO(DATA.week1Start);
     for (const week of DATA.weeks) {
       for (let dow = 0; dow < 7; dow++) {
@@ -84,40 +104,63 @@
     return map;
   }
 
+  function emptyStateExtras() {
+    return {
+      errors: [],
+      simScores: {},
+      iaveDone: {},
+    };
+  }
+
   function loadState() {
-    const defaults = { tasksByDate: null, done: {} };
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return { tasksByDate: buildDefaultTasks(), done: {} };
-      const parsed = JSON.parse(raw);
-      if (!parsed.tasksByDate || Object.keys(parsed.tasksByDate).length === 0) {
-        return { tasksByDate: buildDefaultTasks(), done: parsed.done || {} };
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("cronograma-exames-v1");
+      if (!raw) {
+        return { tasksByDate: buildDefaultTasks(), done: {}, ...emptyStateExtras() };
       }
+      const parsed = JSON.parse(raw);
       return {
-        tasksByDate: parsed.tasksByDate,
+        tasksByDate:
+          parsed.tasksByDate && Object.keys(parsed.tasksByDate).length
+            ? parsed.tasksByDate
+            : buildDefaultTasks(),
         done: parsed.done || {},
+        errors: parsed.errors || [],
+        simScores: parsed.simScores || {},
+        iaveDone: parsed.iaveDone || {},
       };
     } catch {
-      return { tasksByDate: buildDefaultTasks(), done: {} };
+      return { tasksByDate: buildDefaultTasks(), done: {}, ...emptyStateExtras() };
     }
   }
 
   function saveState() {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ tasksByDate: state.tasksByDate, done: state.done }),
+      JSON.stringify({
+        tasksByDate: state.tasksByDate,
+        done: state.done,
+        errors: state.errors,
+        simScores: state.simScores,
+        iaveDone: state.iaveDone,
+      }),
     );
   }
 
   function resetToPlan() {
-    if (!confirm("Repor o plano original? Perdes edições e marcas de concluído.")) return;
-    state = { tasksByDate: buildDefaultTasks(), done: {} };
+    if (!confirm("Repor o plano original? Mantém Caderno de Erros, notas e IAVE.")) return;
+    state.tasksByDate = buildDefaultTasks();
+    state.done = {};
     saveState();
-    render();
+    renderAll();
     if (selectedDate) openDay(selectedDate);
   }
 
   function tasksFor(iso) {
+    return (state.tasksByDate[iso] || []).filter((t) => discFilter.has(t.discipline));
+  }
+
+  function allTasksFor(iso) {
     return state.tasksByDate[iso] || [];
   }
 
@@ -132,14 +175,96 @@
     return { week, phase: meta ? meta.phase : `Semana ${week}` };
   }
 
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
+  function escapeAttr(str) {
+    return escapeHtml(str).replaceAll("'", "&#39;");
+  }
+
+  function shortLabel(task) {
+    return `${task.discipline}: ${task.title}`;
+  }
+
+  function findDateOfTask(id) {
+    for (const [iso, list] of Object.entries(state.tasksByDate)) {
+      if (list.some((t) => t.id === id)) return iso;
+    }
+    return null;
+  }
+
+  function findTask(id) {
+    for (const list of Object.values(state.tasksByDate)) {
+      const found = list.find((t) => t.id === id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function removeTask(id) {
+    for (const iso of Object.keys(state.tasksByDate)) {
+      state.tasksByDate[iso] = state.tasksByDate[iso].filter((t) => t.id !== id);
+      if (state.tasksByDate[iso].length === 0) delete state.tasksByDate[iso];
+    }
+    delete state.done[id];
+  }
+
+  function moveTask(taskId, toDate) {
+    const from = findDateOfTask(taskId);
+    if (!from || from === toDate) return;
+    const task = (state.tasksByDate[from] || []).find((t) => t.id === taskId);
+    if (!task) return;
+    state.tasksByDate[from] = state.tasksByDate[from].filter((t) => t.id !== taskId);
+    if (state.tasksByDate[from].length === 0) delete state.tasksByDate[from];
+    if (!state.tasksByDate[toDate]) state.tasksByDate[toDate] = [];
+    state.tasksByDate[toDate].push(task);
+    saveState();
+  }
+
+  function passFilter(task) {
+    return discFilter.has(task.discipline);
+  }
+
+  /* ——— Legend / filters ——— */
   function renderLegend() {
     els.legend.innerHTML = "";
-    for (const d of DISCIPLINES) {
-      const chip = document.createElement("span");
-      chip.className = "legend-chip";
+    const allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.className = `legend-chip filter-chip${discFilter.size === FILTERABLE.length ? " active" : ""}`;
+    allBtn.textContent = "Todas";
+    allBtn.addEventListener("click", () => {
+      discFilter = new Set(FILTERABLE);
+      renderAll();
+      if (selectedDate) openDay(selectedDate);
+    });
+    els.legend.appendChild(allBtn);
+
+    for (const d of FILTERABLE) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      const on = discFilter.has(d);
+      chip.className = `legend-chip filter-chip${on ? " active" : " dim"}`;
       chip.innerHTML = `<span class="legend-dot disc-${d}"></span>${DATA.disciplineLabels[d]}`;
+      chip.addEventListener("click", () => {
+        if (discFilter.size === FILTERABLE.length) {
+          discFilter = new Set([d]);
+        } else if (discFilter.has(d)) {
+          discFilter.delete(d);
+          if (discFilter.size === 0) discFilter = new Set(FILTERABLE);
+        } else {
+          discFilter.add(d);
+        }
+        renderAll();
+        if (selectedDate) openDay(selectedDate);
+      });
       els.legend.appendChild(chip);
     }
+
     const reset = document.createElement("button");
     reset.type = "button";
     reset.className = "btn ghost small";
@@ -148,16 +273,64 @@
     els.legend.appendChild(reset);
   }
 
-  function renderWeekdayHead() {
-    els.weekdayHead.innerHTML = WEEKDAYS.map((w) => `<span>${w}</span>`).join("");
+  /* ——— Calendar render ——— */
+  function updateNavLabel() {
+    if (viewMode === "month") {
+      els.monthLabel.textContent = `${MONTHS[viewMonth]} ${viewYear}`;
+    } else {
+      const start = startOfWeek(weekAnchor);
+      const end = addDays(start, 6);
+      els.monthLabel.textContent = `${start.getDate()}–${end.getDate()} ${MONTHS[end.getMonth()]} ${end.getFullYear()}`;
+    }
   }
 
-  function renderCalendar() {
-    els.monthLabel.textContent = `${MONTHS[viewMonth]} ${viewYear}`;
-    els.grid.innerHTML = "";
+  function bindDropTarget(cell, iso) {
+    cell.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      cell.classList.add("drop-target");
+    });
+    cell.addEventListener("dragleave", () => cell.classList.remove("drop-target"));
+    cell.addEventListener("drop", (e) => {
+      e.preventDefault();
+      cell.classList.remove("drop-target");
+      const id = e.dataTransfer.getData("text/task-id") || dragTaskId;
+      if (!id) return;
+      moveTask(id, iso);
+      openDay(iso);
+      renderCalendar();
+    });
+  }
 
+  function makeChipEl(task) {
+    const done = !!state.done[task.id];
+    const el = document.createElement("div");
+    el.className = `chip disc-${task.discipline}${done ? " done" : ""}`;
+    el.draggable = true;
+    el.title = `${task.title} (arrasta para outro dia)`;
+    el.textContent = shortLabel(task);
+    el.addEventListener("dragstart", (e) => {
+      dragTaskId = task.id;
+      e.dataTransfer.setData("text/task-id", task.id);
+      e.dataTransfer.effectAllowed = "move";
+      el.classList.add("dragging");
+      e.stopPropagation();
+    });
+    el.addEventListener("dragend", () => {
+      dragTaskId = null;
+      el.classList.remove("dragging");
+    });
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openDay(findDateOfTask(task.id));
+    });
+    return el;
+  }
+
+  function renderMonthGrid() {
+    els.grid.className = "calendar-grid";
+    els.grid.innerHTML = "";
     const first = new Date(viewYear, viewMonth, 1);
-    const startOffset = (first.getDay() + 6) % 7; // Monday=0
+    const startOffset = (first.getDay() + 6) % 7;
     const gridStart = addDays(first, -startOffset);
 
     for (let i = 0; i < 42; i++) {
@@ -171,45 +344,73 @@
       if (iso === selectedDate) cell.classList.add("selected");
       cell.dataset.date = iso;
 
-      const tasks = tasksFor(iso);
-      const visible = tasks.slice(0, 3);
-      const more = tasks.length - visible.length;
+      const num = document.createElement("div");
+      num.className = "day-num";
+      num.textContent = String(date.getDate());
+      cell.appendChild(num);
 
-      cell.innerHTML = `
-        <div class="day-num">${date.getDate()}</div>
-        <div class="day-chips">
-          ${visible
-            .map((task) => {
-              const done = !!state.done[task.id];
-              return `<div class="chip disc-${task.discipline}${done ? " done" : ""}" title="${escapeAttr(task.title)}">${escapeHtml(shortLabel(task))}</div>`;
-            })
-            .join("")}
-          ${more > 0 ? `<div class="chip-more">+${more}</div>` : ""}
-        </div>
-      `;
+      const chipsWrap = document.createElement("div");
+      chipsWrap.className = "day-chips";
+      const tasks = tasksFor(iso);
+      const visible = tasks.slice(0, viewMode === "week" ? 8 : 3);
+      visible.forEach((t) => chipsWrap.appendChild(makeChipEl(t)));
+      if (tasks.length > visible.length) {
+        const more = document.createElement("div");
+        more.className = "chip-more";
+        more.textContent = `+${tasks.length - visible.length}`;
+        chipsWrap.appendChild(more);
+      }
+      cell.appendChild(chipsWrap);
       cell.addEventListener("click", () => openDay(iso));
+      bindDropTarget(cell, iso);
       els.grid.appendChild(cell);
     }
   }
 
-  function shortLabel(task) {
-    return `${task.discipline}: ${task.title}`;
+  function renderWeekGrid() {
+    els.grid.className = "calendar-grid week-grid";
+    els.grid.innerHTML = "";
+    const start = startOfWeek(weekAnchor);
+    viewYear = start.getFullYear();
+    viewMonth = start.getMonth();
+
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(start, i);
+      const iso = toISO(date);
+      const cell = document.createElement("article");
+      cell.className = "day-cell week-cell";
+      if (iso === toISO(new Date())) cell.classList.add("today");
+      if (iso === selectedDate) cell.classList.add("selected");
+      cell.dataset.date = iso;
+
+      const num = document.createElement("div");
+      num.className = "day-num";
+      num.textContent = `${WEEKDAYS[i]} ${date.getDate()}`;
+      cell.appendChild(num);
+
+      const chipsWrap = document.createElement("div");
+      chipsWrap.className = "day-chips";
+      tasksFor(iso).forEach((t) => chipsWrap.appendChild(makeChipEl(t)));
+      cell.appendChild(chipsWrap);
+      cell.addEventListener("click", () => openDay(iso));
+      bindDropTarget(cell, iso);
+      els.grid.appendChild(cell);
+    }
   }
 
-  function escapeHtml(str) {
-    return String(str)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
+  function renderCalendar() {
+    updateNavLabel();
+    els.weekdayHead.innerHTML = WEEKDAYS.map((w) => `<span>${w}</span>`).join("");
+    els.weekdayHead.classList.toggle("hidden", viewMode === "week");
+    if (viewMode === "month") renderMonthGrid();
+    else renderWeekGrid();
   }
 
-  function escapeAttr(str) {
-    return escapeHtml(str).replaceAll("'", "&#39;");
-  }
-
+  /* ——— Day panel ——— */
   function openDay(iso) {
+    if (!iso) return;
     selectedDate = iso;
+    if (viewMode === "week") weekAnchor = parseISO(iso);
     const info = weekInfoFor(iso);
     const d = parseISO(iso);
     els.sideEmpty.classList.add("hidden");
@@ -225,13 +426,15 @@
     });
 
     const tasks = tasksFor(iso);
+    const all = allTasksFor(iso).filter(passFilter);
+    const doneCount = all.filter((t) => state.done[t.id]).length;
+    els.sideProgress.textContent = all.length ? `${doneCount}/${all.length} feitas` : "";
+
     els.taskList.innerHTML = "";
     if (tasks.length === 0) {
-      els.taskList.innerHTML = `<li class="task-card"><p>Sem tarefas. Adiciona uma com “+ Tarefa”.</p></li>`;
+      els.taskList.innerHTML = `<li class="task-card"><p>Sem tarefas neste filtro. Adiciona com “+ Tarefa” ou muda o filtro.</p></li>`;
     } else {
-      for (const task of tasks) {
-        els.taskList.appendChild(renderTaskCard(task));
-      }
+      for (const task of tasks) els.taskList.appendChild(renderTaskCard(task));
     }
     renderCalendar();
   }
@@ -240,6 +443,16 @@
     const li = document.createElement("li");
     const done = !!state.done[task.id];
     li.className = `task-card${done ? " done" : ""}`;
+    li.draggable = true;
+    li.addEventListener("dragstart", (e) => {
+      dragTaskId = task.id;
+      e.dataTransfer.setData("text/task-id", task.id);
+      e.dataTransfer.effectAllowed = "move";
+    });
+    li.addEventListener("dragend", () => {
+      dragTaskId = null;
+    });
+
     li.innerHTML = `
       <div class="task-card-top">
         <input type="checkbox" ${done ? "checked" : ""} aria-label="Marcar como feita" />
@@ -253,27 +466,31 @@
           ${task.detail ? `<p>${escapeHtml(task.detail)}</p>` : ""}
           <div class="task-actions">
             <button type="button" class="btn ghost small" data-edit>Editar</button>
+            <button type="button" class="btn ghost small" data-error>Registar erro</button>
           </div>
         </div>
       </div>
     `;
     li.querySelector('input[type="checkbox"]').addEventListener("change", (e) => {
-      state.done[task.id] = e.target.checked;
-      if (!e.target.checked) delete state.done[task.id];
+      if (e.target.checked) state.done[task.id] = true;
+      else delete state.done[task.id];
       saveState();
       openDay(selectedDate);
     });
     li.querySelector("[data-edit]").addEventListener("click", () => openModal(task));
+    li.querySelector("[data-error]").addEventListener("click", () => openErrorModal(task));
     return li;
   }
 
+  /* ——— Task modal ——— */
   function fillSelects() {
-    const disc = els.form.elements.discipline;
-    const type = els.form.elements.type;
-    disc.innerHTML = DISCIPLINES.map(
-      (d) => `<option value="${d}">${DATA.disciplineLabels[d]}</option>`,
-    ).join("");
-    type.innerHTML = TYPES.map(
+    for (const form of [els.form, els.errorForm]) {
+      const disc = form.elements.discipline;
+      disc.innerHTML = DISCIPLINES.map(
+        (d) => `<option value="${d}">${DATA.disciplineLabels[d]}</option>`,
+      ).join("");
+    }
+    els.form.elements.type.innerHTML = TYPES.map(
       (t) => `<option value="${t}">${DATA.typeLabels[t]}</option>`,
     ).join("");
   }
@@ -293,21 +510,6 @@
     els.modal.showModal();
   }
 
-  function findDateOfTask(id) {
-    for (const [iso, list] of Object.entries(state.tasksByDate)) {
-      if (list.some((t) => t.id === id)) return iso;
-    }
-    return null;
-  }
-
-  function removeTask(id) {
-    for (const iso of Object.keys(state.tasksByDate)) {
-      state.tasksByDate[iso] = state.tasksByDate[iso].filter((t) => t.id !== id);
-      if (state.tasksByDate[iso].length === 0) delete state.tasksByDate[iso];
-    }
-    delete state.done[id];
-  }
-
   function saveTaskFromForm() {
     const title = els.form.elements.title.value.trim();
     if (!title) return;
@@ -320,11 +522,10 @@
       type: els.form.elements.type.value,
       duration: els.form.elements.duration.value.trim() || "—",
     };
-
     if (editingTaskId) {
       const oldDate = findDateOfTask(editingTaskId);
       if (oldDate) {
-        const existing = (state.tasksByDate[oldDate] || []).find((t) => t.id === editingTaskId);
+        const existing = allTasksFor(oldDate).find((t) => t.id === editingTaskId);
         if (existing) {
           payload.week = existing.week;
           payload.phase = existing.phase;
@@ -332,16 +533,226 @@
         removeTask(editingTaskId);
       }
     }
-
     if (!state.tasksByDate[date]) state.tasksByDate[date] = [];
     state.tasksByDate[date].push(payload);
     saveState();
     openDay(date);
   }
 
-  async function exportMonthPng() {
+  /* ——— Caderno de Erros ——— */
+  function openErrorModal(task) {
+    const f = els.errorForm;
+    f.elements.discipline.value = task?.discipline || "FIS";
+    f.elements.date.value = selectedDate || toISO(new Date());
+    f.elements.topic.value = task?.title || "";
+    f.elements.notes.value = "";
+    f.elements.schedule.checked = true;
+    f.dataset.taskId = task?.id || "";
+    els.errorModal.showModal();
+  }
+
+  function saveErrorFromForm() {
+    const f = els.errorForm;
+    const topic = f.elements.topic.value.trim();
+    if (!topic) return;
+    const entry = {
+      id: uid("err"),
+      discipline: f.elements.discipline.value,
+      date: f.elements.date.value,
+      topic,
+      notes: f.elements.notes.value.trim(),
+      taskId: f.dataset.taskId || null,
+      createdAt: new Date().toISOString(),
+    };
+    state.errors.unshift(entry);
+
+    if (f.elements.schedule.checked) {
+      const reinforceDate = toISO(addDays(parseISO(entry.date), 3));
+      if (!state.tasksByDate[reinforceDate]) state.tasksByDate[reinforceDate] = [];
+      state.tasksByDate[reinforceDate].push({
+        id: uid("reinforce"),
+        discipline: entry.discipline,
+        type: "exercicios",
+        title: `Reforço: ${entry.topic}`,
+        detail: `Do Caderno de Erros (${entry.date}). ${entry.notes || ""}`.trim(),
+        duration: "1h–1h30",
+      });
+    }
+    saveState();
+    renderErrors();
+    renderCalendar();
+  }
+
+  function renderErrors() {
+    const list = els.errorsList;
+    list.innerHTML = "";
+    if (!state.errors.length) {
+      list.innerHTML = `<div class="empty-hint">Ainda sem erros registados. No calendário, abre uma tarefa e clica “Registar erro”.</div>`;
+      return;
+    }
+    for (const err of state.errors) {
+      const card = document.createElement("article");
+      card.className = "tool-card";
+      card.innerHTML = `
+        <div class="tool-card-top">
+          <span class="tag disc-${err.discipline}" style="color:#fff">${escapeHtml(DATA.disciplineLabels[err.discipline] || err.discipline)}</span>
+          <span class="duration">${escapeHtml(err.date)}</span>
+        </div>
+        <h3>${escapeHtml(err.topic)}</h3>
+        ${err.notes ? `<p>${escapeHtml(err.notes)}</p>` : ""}
+        <div class="task-actions">
+          <button type="button" class="btn ghost small" data-goto>Ir ao dia</button>
+          <button type="button" class="btn danger ghost small" data-del>Apagar</button>
+        </div>
+      `;
+      card.querySelector("[data-goto]").addEventListener("click", () => {
+        switchTab("calendar");
+        const d = parseISO(err.date);
+        viewYear = d.getFullYear();
+        viewMonth = d.getMonth();
+        weekAnchor = d;
+        openDay(err.date);
+      });
+      card.querySelector("[data-del]").addEventListener("click", () => {
+        if (!confirm("Apagar este registo?")) return;
+        state.errors = state.errors.filter((e) => e.id !== err.id);
+        saveState();
+        renderErrors();
+      });
+      list.appendChild(card);
+    }
+  }
+
+  /* ——— Simulacros ——— */
+  function renderSims() {
+    els.simsList.innerHTML = "";
+    const bySubject = { FQ: [], MAT: [], PORT: [] };
+    for (const slot of SIMS) {
+      const score = state.simScores[slot.id];
+      bySubject[slot.subject]?.push({ ...slot, score });
+
+      const card = document.createElement("article");
+      card.className = "tool-card";
+      const pct = score != null && score !== "" ? Math.round((Number(score) / slot.max) * 100) : null;
+      card.innerHTML = `
+        <div class="tool-card-top">
+          <span class="tag disc-${slot.subject === "FQ" ? "FQ" : slot.subject}" style="color:#fff">${escapeHtml(slot.subject)}</span>
+          <span class="duration">Semana ${slot.week}</span>
+        </div>
+        <h3>${escapeHtml(slot.label)}</h3>
+        <label class="score-label">Nota (0–${slot.max})
+          <input type="number" min="0" max="${slot.max}" step="1" value="${score ?? ""}" data-sim="${slot.id}" />
+        </label>
+        ${pct != null ? `<p class="score-pct">${pct}%</p>` : `<p class="duration">Ainda sem nota</p>`}
+      `;
+      card.querySelector("input").addEventListener("change", (e) => {
+        const v = e.target.value;
+        if (v === "") delete state.simScores[slot.id];
+        else state.simScores[slot.id] = Math.min(slot.max, Math.max(0, Number(v)));
+        saveState();
+        renderSims();
+      });
+      els.simsList.appendChild(card);
+    }
+
+    // summary comparison
+    const rounds = [
+      { key: "sim1", label: "Simulacro 1" },
+      { key: "sim2", label: "Simulacro 2" },
+      { key: "simf", label: "Final" },
+    ];
+    const subjects = ["FQ", "MAT", "PORT"];
+    let html = `<div class="sims-table-wrap"><table class="sims-table"><thead><tr><th>Prova</th>${subjects.map((s) => `<th>${s}</th>`).join("")}</tr></thead><tbody>`;
+    for (const r of rounds) {
+      html += `<tr><td>${r.label}</td>`;
+      for (const s of subjects) {
+        const id = `${r.key}-${s.toLowerCase()}`;
+        const sc = state.simScores[id];
+        html += `<td>${sc != null ? sc : "—"}</td>`;
+      }
+      html += `</tr>`;
+    }
+    html += `</tbody></table></div>`;
+    els.simsChart.innerHTML = html;
+  }
+
+  /* ——— IAVE ——— */
+  function renderIave() {
+    els.iaveFilters.innerHTML = "";
+    for (const key of ["ALL", "FQ", "MAT", "PORT"]) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `btn small${iaveSubjectFilter === key ? " primary" : " ghost"}`;
+      btn.textContent = key === "ALL" ? "Todas" : key;
+      btn.addEventListener("click", () => {
+        iaveSubjectFilter = key;
+        renderIave();
+      });
+      els.iaveFilters.appendChild(btn);
+    }
+
+    const exams = IAVE.filter((e) => e.id !== "iave-hub").filter(
+      (e) => iaveSubjectFilter === "ALL" || e.subject === iaveSubjectFilter,
+    );
+    const doneCount = exams.filter((e) => state.iaveDone[e.id]).length;
+    els.iaveProgress.textContent = `${doneCount}/${exams.length} feitos`;
+
+    els.iaveList.innerHTML = "";
+    const hub = IAVE.find((e) => e.id === "iave-hub");
+    if (hub) {
+      const hubCard = document.createElement("article");
+      hubCard.className = "tool-card";
+      hubCard.innerHTML = `<h3>Portal IAVE</h3><p>Se algum link direto falhar, usa o hub oficial.</p><a class="btn primary small" href="${hub.url}" target="_blank" rel="noopener">Abrir iave.pt</a>`;
+      els.iaveList.appendChild(hubCard);
+    }
+
+    for (const exam of exams) {
+      const done = !!state.iaveDone[exam.id];
+      const card = document.createElement("article");
+      card.className = `tool-card${done ? " done-exam" : ""}`;
+      card.innerHTML = `
+        <div class="tool-card-top">
+          <span class="tag disc-${exam.subject}" style="color:#fff">${exam.subject}</span>
+          <span class="duration">${exam.phase || ""} ${exam.year || ""}</span>
+        </div>
+        <h3>${escapeHtml(exam.label)}</h3>
+        <div class="task-actions">
+          <label class="check-row tight">
+            <input type="checkbox" ${done ? "checked" : ""} data-iave="${exam.id}" />
+            Já resolvi
+          </label>
+          <a class="btn ghost small" href="${exam.url}" target="_blank" rel="noopener">Abrir prova</a>
+        </div>
+      `;
+      card.querySelector("input").addEventListener("change", (e) => {
+        if (e.target.checked) state.iaveDone[exam.id] = true;
+        else delete state.iaveDone[exam.id];
+        saveState();
+        renderIave();
+      });
+      els.iaveList.appendChild(card);
+    }
+  }
+
+  /* ——— Tabs / nav ——— */
+  function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll(".tab").forEach((b) => {
+      b.classList.toggle("active", b.dataset.tab === tab);
+    });
+    document.getElementById("panel-calendar").classList.toggle("hidden", tab !== "calendar");
+    document.getElementById("panel-errors").classList.toggle("hidden", tab !== "errors");
+    document.getElementById("panel-sims").classList.toggle("hidden", tab !== "sims");
+    document.getElementById("panel-iave").classList.toggle("hidden", tab !== "iave");
+    els.legend.classList.toggle("hidden", tab !== "calendar");
+    if (tab === "errors") renderErrors();
+    if (tab === "sims") renderSims();
+    if (tab === "iave") renderIave();
+  }
+
+  async function exportPng() {
     if (typeof html2canvas !== "function") {
-      alert("Biblioteca de exportação não carregou. Verifica a ligação à internet.");
+      alert("Biblioteca de exportação não carregou.");
       return;
     }
     const btn = document.getElementById("btn-export");
@@ -354,53 +765,82 @@
         useCORS: true,
       });
       const link = document.createElement("a");
-      link.download = `cronograma-${viewYear}-${String(viewMonth + 1).padStart(2, "0")}.png`;
+      const tag = viewMode === "week" ? "semana" : `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+      link.download = `cronograma-${tag}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (err) {
       console.error(err);
-      alert("Não foi possível exportar a imagem.");
+      alert("Não foi possível exportar.");
     } finally {
       btn.disabled = false;
-      btn.textContent = "Exportar mês (PNG)";
+      btn.textContent = "Exportar (PNG)";
     }
   }
 
-  function render() {
+  function renderAll() {
+    renderLegend();
     renderCalendar();
+    if (activeTab === "errors") renderErrors();
+    if (activeTab === "sims") renderSims();
+    if (activeTab === "iave") renderIave();
   }
 
   function bind() {
+    document.querySelectorAll(".tab").forEach((btn) => {
+      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    });
+    document.querySelectorAll(".view-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        viewMode = btn.dataset.view;
+        document.querySelectorAll(".view-btn").forEach((b) => b.classList.toggle("active", b === btn));
+        if (viewMode === "week" && selectedDate) weekAnchor = parseISO(selectedDate);
+        renderCalendar();
+      });
+    });
+
     document.getElementById("btn-prev").addEventListener("click", () => {
-      viewMonth -= 1;
-      if (viewMonth < 0) {
-        viewMonth = 11;
-        viewYear -= 1;
+      if (viewMode === "month") {
+        viewMonth -= 1;
+        if (viewMonth < 0) {
+          viewMonth = 11;
+          viewYear -= 1;
+        }
+      } else {
+        weekAnchor = addDays(weekAnchor, -7);
       }
-      render();
+      renderCalendar();
     });
     document.getElementById("btn-next").addEventListener("click", () => {
-      viewMonth += 1;
-      if (viewMonth > 11) {
-        viewMonth = 0;
-        viewYear += 1;
+      if (viewMode === "month") {
+        viewMonth += 1;
+        if (viewMonth > 11) {
+          viewMonth = 0;
+          viewYear += 1;
+        }
+      } else {
+        weekAnchor = addDays(weekAnchor, 7);
       }
-      render();
+      renderCalendar();
     });
     document.getElementById("btn-today").addEventListener("click", () => {
       const now = new Date();
       viewYear = now.getFullYear();
       viewMonth = now.getMonth();
+      weekAnchor = now;
+      switchTab("calendar");
       openDay(toISO(now));
     });
-    document.getElementById("btn-export").addEventListener("click", exportMonthPng);
+    document.getElementById("btn-export").addEventListener("click", exportPng);
     document.getElementById("btn-close-panel").addEventListener("click", () => {
       selectedDate = null;
       els.sideContent.classList.add("hidden");
       els.sideEmpty.classList.remove("hidden");
-      render();
+      renderCalendar();
     });
     document.getElementById("btn-add-task").addEventListener("click", () => openModal(null));
+    document.getElementById("btn-add-error").addEventListener("click", () => openErrorModal(null));
+
     els.btnDelete.addEventListener("click", () => {
       if (!editingTaskId) return;
       if (!confirm("Apagar esta tarefa?")) return;
@@ -410,19 +850,21 @@
       openDay(selectedDate);
     });
     els.form.addEventListener("submit", (e) => {
-      const submitter = e.submitter;
-      if (submitter && submitter.value === "cancel") return;
+      if (e.submitter && e.submitter.value === "cancel") return;
       e.preventDefault();
       saveTaskFromForm();
       els.modal.close();
     });
+    els.errorForm.addEventListener("submit", (e) => {
+      if (e.submitter && e.submitter.value === "cancel") return;
+      e.preventDefault();
+      saveErrorFromForm();
+      els.errorModal.close();
+    });
   }
 
   // init
-  if (!state.tasksByDate) state.tasksByDate = buildDefaultTasks();
   fillSelects();
-  renderLegend();
-  renderWeekdayHead();
   bind();
-  render();
+  renderAll();
 })();

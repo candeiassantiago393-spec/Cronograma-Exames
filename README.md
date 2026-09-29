@@ -4,12 +4,17 @@ Calendário de estudo (estilo agenda) para **Física e Química A**, **Matemáti
 
 ## Funcionalidades
 
-- Vista mensal com chips por disciplina
-- Painel lateral ao clicar num dia (detalhes, tipo de tarefa, duração)
-- Marcar tarefas como feitas (guardado no browser)
-- Editar / adicionar / apagar / mover tarefas (alterando a data)
-- Exportar a grelha do mês em **PNG**
-- Plano completo: preparação 1–4 out + 32 semanas a partir de **5 de outubro de 2026**
+- Vista **mês** e **semana**
+- Chips por disciplina + **filtro** (clica na legenda)
+- Painel lateral com detalhes, progresso do dia e tipos de tarefa
+- Marcar como feitas (guardado no browser)
+- Editar / adicionar / apagar tarefas
+- **Arrastar** chips ou cartões entre dias
+- **Caderno de Erros** (registo a partir de uma tarefa + reforço no calendário)
+- **Notas de simulacros** (S1 / S2 / Final) com tabela comparativa
+- **Exames IAVE** com links e checkbox “já resolvi”
+- Exportar grelha em **PNG**
+- Plano: preparação 1–4 out + 32 semanas a partir de **5 de outubro de 2026**
 
 ## Abrir localmente
 

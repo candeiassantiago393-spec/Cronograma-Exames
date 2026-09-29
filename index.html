@@ -20,44 +20,98 @@
         </div>
       </div>
       <div class="topbar-actions">
+        <div class="view-toggle" role="group" aria-label="Vista">
+          <button type="button" class="btn small view-btn active" data-view="month">Mês</button>
+          <button type="button" class="btn small view-btn" data-view="week">Semana</button>
+        </div>
         <button type="button" class="btn ghost" id="btn-today">Hoje</button>
         <div class="month-nav">
-          <button type="button" class="icon-btn" id="btn-prev" aria-label="Mês anterior">‹</button>
+          <button type="button" class="icon-btn" id="btn-prev" aria-label="Anterior">‹</button>
           <h2 id="month-label">Outubro 2026</h2>
-          <button type="button" class="icon-btn" id="btn-next" aria-label="Mês seguinte">›</button>
+          <button type="button" class="icon-btn" id="btn-next" aria-label="Seguinte">›</button>
         </div>
-        <button type="button" class="btn primary" id="btn-export">Exportar mês (PNG)</button>
+        <button type="button" class="btn primary" id="btn-export">Exportar (PNG)</button>
       </div>
     </header>
 
+    <nav class="tabs" id="main-tabs" aria-label="Secções">
+      <button type="button" class="tab active" data-tab="calendar">Calendário</button>
+      <button type="button" class="tab" data-tab="errors">Caderno de Erros</button>
+      <button type="button" class="tab" data-tab="sims">Simulacros</button>
+      <button type="button" class="tab" data-tab="iave">Exames IAVE</button>
+    </nav>
+
     <div class="legend" id="legend"></div>
 
-    <main class="layout">
-      <section class="calendar-wrap" id="calendar-export-root">
-        <div class="calendar-head" id="weekday-head"></div>
-        <div class="calendar-grid" id="calendar-grid"></div>
-      </section>
+    <section class="tab-panel" id="panel-calendar">
+      <main class="layout">
+        <section class="calendar-wrap" id="calendar-export-root">
+          <div class="calendar-head" id="weekday-head"></div>
+          <div class="calendar-grid" id="calendar-grid"></div>
+        </section>
 
-      <aside class="side-panel" id="side-panel" aria-live="polite">
-        <div class="side-empty" id="side-empty">
-          <h3>Seleciona um dia</h3>
-          <p>Clica num dia do calendário para ver as tarefas, marcar como feitas ou editar.</p>
-        </div>
-        <div class="side-content hidden" id="side-content">
-          <div class="side-header">
-            <div>
-              <p class="side-eyebrow" id="side-week"></p>
-              <h3 id="side-date"></h3>
+        <aside class="side-panel" id="side-panel" aria-live="polite">
+          <div class="side-empty" id="side-empty">
+            <h3>Seleciona um dia</h3>
+            <p>Clica num dia, arrasta chips entre dias, ou filtra disciplinas na legenda.</p>
+          </div>
+          <div class="side-content hidden" id="side-content">
+            <div class="side-header">
+              <div>
+                <p class="side-eyebrow" id="side-week"></p>
+                <h3 id="side-date"></h3>
+              </div>
+              <button type="button" class="icon-btn" id="btn-close-panel" aria-label="Fechar">×</button>
             </div>
-            <button type="button" class="icon-btn" id="btn-close-panel" aria-label="Fechar">×</button>
+            <div class="side-toolbar">
+              <button type="button" class="btn ghost small" id="btn-add-task">+ Tarefa</button>
+              <span class="side-progress" id="side-progress"></span>
+            </div>
+            <ul class="task-list" id="task-list"></ul>
           </div>
-          <div class="side-toolbar">
-            <button type="button" class="btn ghost small" id="btn-add-task">+ Tarefa</button>
+        </aside>
+      </main>
+    </section>
+
+    <section class="tab-panel hidden" id="panel-errors">
+      <div class="tools-card">
+        <div class="tools-header">
+          <div>
+            <h2>Caderno de Erros</h2>
+            <p>Regista falhas a partir das tarefas e cria reforço no calendário.</p>
           </div>
-          <ul class="task-list" id="task-list"></ul>
+          <button type="button" class="btn primary" id="btn-add-error">+ Erro</button>
         </div>
-      </aside>
-    </main>
+        <div id="errors-list" class="cards-list"></div>
+      </div>
+    </section>
+
+    <section class="tab-panel hidden" id="panel-sims">
+      <div class="tools-card">
+        <div class="tools-header">
+          <div>
+            <h2>Notas dos simulacros</h2>
+            <p>Compara evolução entre Simulacro 1, 2 e Final (escala 0–200).</p>
+          </div>
+        </div>
+        <div id="sims-chart" class="sims-summary"></div>
+        <div id="sims-list" class="cards-list"></div>
+      </div>
+    </section>
+
+    <section class="tab-panel hidden" id="panel-iave">
+      <div class="tools-card">
+        <div class="tools-header">
+          <div>
+            <h2>Exames IAVE</h2>
+            <p>Marca os que já resolveste. Links oficiais (podem mudar no site do IAVE).</p>
+          </div>
+          <span class="side-progress" id="iave-progress"></span>
+        </div>
+        <div class="iave-filters" id="iave-filters"></div>
+        <div id="iave-list" class="cards-list"></div>
+      </div>
+    </section>
   </div>
 
   <dialog class="modal" id="task-modal">
@@ -95,8 +149,40 @@
     </form>
   </dialog>
 
+  <dialog class="modal" id="error-modal">
+    <form method="dialog" id="error-form">
+      <h3>Registar erro</h3>
+      <div class="form-row">
+        <label>Disciplina
+          <select name="discipline"></select>
+        </label>
+        <label>Data
+          <input type="date" name="date" required />
+        </label>
+      </div>
+      <label>Tema / tópico
+        <input type="text" name="topic" required maxlength="200" placeholder="ex: Planos inclinados" />
+      </label>
+      <label>O que falhou
+        <textarea name="notes" rows="4" maxlength="2000" placeholder="Erro conceptual, cálculo, interpretação…"></textarea>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" name="schedule" checked />
+        Criar tarefa de reforço no calendário (daqui a 3 dias)
+      </label>
+      <div class="modal-actions">
+        <span></span>
+        <div class="modal-actions-right">
+          <button type="submit" value="cancel" class="btn ghost">Cancelar</button>
+          <button type="submit" value="save" class="btn primary">Guardar</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/extras.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
