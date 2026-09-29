@@ -8,7 +8,6 @@ window.CRONOGRAMA_DATA = {
     "ficha_iave": "Ficha IAVE / exame",
     "simulacro": "Simulacro",
     "redacao": "Redação / escrita",
-    "descanso": "Descanso",
     "preparacao": "Preparação"
   },
   "disciplineLabels": {
@@ -17,8 +16,7 @@ window.CRONOGRAMA_DATA = {
     "PORT": "Português",
     "QUI": "Química",
     "FQ": "FQ A",
-    "PREP": "Preparação",
-    "DESC": "Descanso"
+    "PREP": "Preparação"
   },
   "prepDays": [
     {
@@ -80,15 +78,7 @@ window.CRONOGRAMA_DATA = {
     },
     {
       "date": "2026-10-04",
-      "tasks": [
-        {
-          "discipline": "DESC",
-          "type": "descanso",
-          "title": "Descanso / preparação mental",
-          "detail": "Sem carga de estudo. Começar frescos na 2.ª feira.",
-          "duration": "—"
-        }
-      ]
+      "tasks": []
     }
   ],
   "weeks": [
@@ -206,15 +196,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -324,15 +306,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -442,15 +416,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -560,15 +526,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -671,15 +629,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -782,15 +732,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -893,15 +835,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -1004,15 +938,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -1122,15 +1048,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -1240,15 +1158,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -1358,15 +1268,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -1476,15 +1378,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -1594,15 +1488,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -1712,15 +1598,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -1830,15 +1708,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -1941,15 +1811,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -2059,15 +1921,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -2177,15 +2031,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -2295,15 +2141,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -2406,15 +2244,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -2517,15 +2347,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -2628,15 +2450,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -2746,15 +2560,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -2864,15 +2670,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -2954,15 +2752,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -3037,15 +2827,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -3127,15 +2909,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -3210,15 +2984,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -3279,15 +3045,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -3369,15 +3127,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -3459,15 +3209,7 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        []
       ]
     },
     {
@@ -3519,24 +3261,8 @@ window.CRONOGRAMA_DATA = {
             "duration": "—"
           }
         ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso e celebração",
-            "detail": "Cumprimento do plano!",
-            "duration": "—"
-          }
-        ],
-        [
-          {
-            "discipline": "DESC",
-            "type": "descanso",
-            "title": "Descanso total",
-            "detail": "Sem estudo. Recuperação.",
-            "duration": "—"
-          }
-        ]
+        [],
+        []
       ]
     }
   ]

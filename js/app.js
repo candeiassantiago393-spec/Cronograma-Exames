@@ -9,7 +9,7 @@
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
   ];
 
-  const BUILTIN_IDS = ["FIS", "MAT", "PORT", "QUI", "FQ", "PREP", "DESC"];
+  const BUILTIN_IDS = ["FIS", "MAT", "PORT", "QUI", "FQ", "PREP"];
   const TYPES = Object.keys(DATA.typeLabels);
   const DIFFICULTY_LABELS = {
     facil: "Fácil",
@@ -104,7 +104,6 @@
       QUI: "#6dbfb5",
       FQ: "#9aa8c4",
       PREP: "#c4b5a5",
-      DESC: "#b5aed0",
     };
     return builtin[id] || "#57534e";
   }
@@ -197,6 +196,16 @@
     };
   }
 
+  function stripDescansoFromPlan(tasksByDate) {
+    for (const iso of Object.keys(tasksByDate || {})) {
+      tasksByDate[iso] = (tasksByDate[iso] || []).filter(
+        (t) => t.discipline !== "DESC" && t.type !== "descanso",
+      );
+      if (!tasksByDate[iso].length) delete tasksByDate[iso];
+    }
+    return tasksByDate;
+  }
+
   function loadState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("cronograma-exames-v1");
@@ -204,11 +213,12 @@
         return { tasksByDate: buildDefaultTasks(), done: {}, ...emptyStateExtras() };
       }
       const parsed = JSON.parse(raw);
+      const tasksByDate =
+        parsed.tasksByDate && Object.keys(parsed.tasksByDate).length
+          ? stripDescansoFromPlan(parsed.tasksByDate)
+          : buildDefaultTasks();
       return {
-        tasksByDate:
-          parsed.tasksByDate && Object.keys(parsed.tasksByDate).length
-            ? parsed.tasksByDate
-            : buildDefaultTasks(),
+        tasksByDate,
         done: parsed.done || {},
         errors: parsed.errors || [],
         simScores: parsed.simScores || {},

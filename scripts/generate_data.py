@@ -10,7 +10,6 @@ TYPE_LABELS = {
     "ficha_iave": "Ficha IAVE / exame",
     "simulacro": "Simulacro",
     "redacao": "Redação / escrita",
-    "descanso": "Descanso",
     "preparacao": "Preparação",
 }
 
@@ -21,7 +20,6 @@ DISC_LABELS = {
     "QUI": "Química",
     "FQ": "FQ A",
     "PREP": "Preparação",
-    "DESC": "Descanso",
 }
 
 def t(discipline, type_, title, detail="", duration="1h30–2h"):
@@ -34,7 +32,7 @@ def t(discipline, type_, title, detail="", duration="1h30–2h"):
     }
 
 def sun():
-    return [t("DESC", "descanso", "Descanso total", "Sem estudo. Recuperação.", "—")]
+    return []
 
 # Week data: list of 7 days (Mon..Sun), each a list of tasks
 weeks = []
@@ -659,7 +657,7 @@ weeks.append({
         [t("PORT", "resumo", "Leitura leve — fichas das obras", "Máximo 2 horas.", "≤2h")],
         [t("PREP", "preparacao", "Descanso total — preparar material", "Canetas, CC, calculadora permitida, água. Sem estudo intensivo.", "—")],
         [t("PREP", "preparacao", "Dia de exame — foco e confiança", "Gerir o tempo conforme o treino dos 8 meses.", "—")],
-        [t("DESC", "descanso", "Descanso e celebração", "Cumprimento do plano!", "—")],
+        [],
         sun(),
     ],
 })
@@ -688,9 +686,7 @@ prep = [
     },
     {
         "date": "2026-10-04",
-        "tasks": [
-            t("DESC", "descanso", "Descanso / preparação mental", "Sem carga de estudo. Começar frescos na 2.ª feira.", "—"),
-        ],
+        "tasks": [],
     },
 ]
 
