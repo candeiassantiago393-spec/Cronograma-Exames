@@ -107,9 +107,12 @@
         <div class="tools-header">
           <div>
             <h2>Exames IAVE</h2>
-            <p>Marca os que já resolveste. Links oficiais (podem mudar no site do IAVE).</p>
+            <p>Adiciona anos, cola o link do enunciado e da correção, e marca os que já fizeste.</p>
           </div>
-          <span class="side-progress" id="iave-progress"></span>
+          <div class="tools-header-actions">
+            <span class="side-progress" id="iave-progress"></span>
+            <button type="button" class="btn primary" id="btn-add-iave">+ Exame</button>
+          </div>
         </div>
         <div class="iave-filters" id="iave-filters"></div>
         <div id="iave-list" class="cards-list"></div>
@@ -215,6 +218,47 @@
         <div class="modal-actions-right">
           <button type="submit" value="cancel" formnovalidate class="btn ghost">Fechar</button>
           <button type="submit" value="save" class="btn primary">Adicionar</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="iave-modal">
+    <form method="dialog" id="iave-form">
+      <div class="modal-head">
+        <h3 id="iave-modal-title">Novo exame IAVE</h3>
+        <button type="submit" value="cancel" formnovalidate class="icon-btn modal-close" aria-label="Fechar">×</button>
+      </div>
+      <p class="modal-hint">Cola os links diretos do PDF (enunciado e correção) a partir do site do IAVE.</p>
+      <label>Nome
+        <input type="text" name="label" required maxlength="120" placeholder="ex: Matemática A — 1.ª fase 2021" />
+      </label>
+      <div class="form-row">
+        <label>Disciplina
+          <select name="subject">
+            <option value="FQ">FQ A</option>
+            <option value="MAT">Matemática A</option>
+            <option value="PORT">Português</option>
+          </select>
+        </label>
+        <label>Ano
+          <input type="number" name="year" min="2006" max="2035" placeholder="2024" />
+        </label>
+      </div>
+      <label>Fase / nota
+        <input type="text" name="phase" maxlength="40" placeholder="ex: 1.ª fase, Época especial…" />
+      </label>
+      <label>Link do enunciado (exame)
+        <input type="url" name="url" maxlength="500" placeholder="https://…" />
+      </label>
+      <label>Link da correção / critérios
+        <input type="url" name="correctionUrl" maxlength="500" placeholder="https://…" />
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn danger ghost hidden" id="btn-delete-iave">Apagar</button>
+        <div class="modal-actions-right">
+          <button type="submit" value="cancel" formnovalidate class="btn ghost">Cancelar</button>
+          <button type="submit" value="save" class="btn primary">Guardar</button>
         </div>
       </div>
     </form>

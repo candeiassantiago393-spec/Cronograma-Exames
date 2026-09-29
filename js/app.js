@@ -67,7 +67,13 @@
     subjectForm: document.getElementById("subject-form"),
     subjectList: document.getElementById("subject-list"),
     colorSwatches: document.getElementById("color-swatches"),
+    iaveModal: document.getElementById("iave-modal"),
+    iaveForm: document.getElementById("iave-form"),
+    iaveModalTitle: document.getElementById("iave-modal-title"),
+    btnDeleteIave: document.getElementById("btn-delete-iave"),
   };
+
+  let editingIaveId = null;
 
   function allDisciplineIds() {
     const custom = (state?.customSubjects || []).map((s) => s.id);
@@ -179,6 +185,8 @@
       iaveDone: {},
       customSubjects: [],
       subjectColors: {},
+      iaveCustom: [],
+      iaveOverrides: {},
     };
   }
 
@@ -200,6 +208,8 @@
         iaveDone: parsed.iaveDone || {},
         customSubjects: parsed.customSubjects || [],
         subjectColors: parsed.subjectColors || {},
+        iaveCustom: parsed.iaveCustom || [],
+        iaveOverrides: parsed.iaveOverrides || {},
       };
     } catch {
       return { tasksByDate: buildDefaultTasks(), done: {}, ...emptyStateExtras() };
@@ -217,6 +227,8 @@
         iaveDone: state.iaveDone,
         customSubjects: state.customSubjects || [],
         subjectColors: state.subjectColors || {},
+        iaveCustom: state.iaveCustom || [],
+        iaveOverrides: state.iaveOverrides || {},
       }),
     );
   }
@@ -837,6 +849,100 @@
   }
 
   /* ——— IAVE ——— */
+  function normalizeUrl(value) {
+    const v = (value || "").trim();
+    if (!v) return "";
+    if (/^https?:\/\//i.test(v)) return v;
+    return `https://${v}`;
+  }
+
+  function getAllIaveExams() {
+    const builtins = IAVE.filter((e) => e.id !== "iave-hub").map((e) => {
+      const ov = (state.iaveOverrides || {})[e.id] || {};
+      return {
+        ...e,
+        label: ov.label ?? e.label,
+        url: ov.url ?? e.url ?? "",
+        correctionUrl: ov.correctionUrl ?? e.correctionUrl ?? "",
+        year: ov.year ?? e.year,
+        phase: ov.phase ?? e.phase,
+        subject: ov.subject ?? e.subject,
+        custom: false,
+      };
+    });
+    const customs = (state.iaveCustom || []).map((e) => ({ ...e, custom: true }));
+    return [...builtins, ...customs].sort((a, b) => {
+      const ya = Number(b.year) || 0;
+      const yb = Number(a.year) || 0;
+      if (ya !== yb) return ya - yb;
+      return String(a.label).localeCompare(String(b.label), "pt");
+    });
+  }
+
+  function findIaveExam(id) {
+    return getAllIaveExams().find((e) => e.id === id) || null;
+  }
+
+  function openIaveModal(exam) {
+    editingIaveId = exam?.id || null;
+    const f = els.iaveForm;
+    els.iaveModalTitle.textContent = exam ? "Editar exame IAVE" : "Novo exame IAVE";
+    els.btnDeleteIave.classList.toggle("hidden", !(exam && exam.custom));
+    f.elements.label.value = exam?.label || "";
+    f.elements.subject.value = exam?.subject || "MAT";
+    f.elements.year.value = exam?.year ?? "";
+    f.elements.phase.value = exam?.phase || "";
+    f.elements.url.value = exam?.url || "";
+    f.elements.correctionUrl.value = exam?.correctionUrl || "";
+    els.iaveModal.showModal();
+  }
+
+  function saveIaveFromForm() {
+    const f = els.iaveForm;
+    const label = f.elements.label.value.trim();
+    if (!label) return;
+    const payload = {
+      label,
+      subject: f.elements.subject.value,
+      year: f.elements.year.value ? Number(f.elements.year.value) : null,
+      phase: f.elements.phase.value.trim(),
+      url: normalizeUrl(f.elements.url.value),
+      correctionUrl: normalizeUrl(f.elements.correctionUrl.value),
+    };
+
+    if (editingIaveId) {
+      const existing = findIaveExam(editingIaveId);
+      if (existing?.custom) {
+        state.iaveCustom = (state.iaveCustom || []).map((e) =>
+          e.id === editingIaveId ? { ...e, ...payload } : e,
+        );
+      } else {
+        if (!state.iaveOverrides) state.iaveOverrides = {};
+        state.iaveOverrides[editingIaveId] = {
+          ...(state.iaveOverrides[editingIaveId] || {}),
+          ...payload,
+        };
+      }
+    } else {
+      if (!state.iaveCustom) state.iaveCustom = [];
+      state.iaveCustom.push({ id: uid("iave"), ...payload });
+    }
+    saveState();
+    renderIave();
+  }
+
+  function deleteIaveExam() {
+    if (!editingIaveId) return;
+    const exam = findIaveExam(editingIaveId);
+    if (!exam?.custom) return;
+    if (!confirm(`Apagar “${exam.label}”?`)) return;
+    state.iaveCustom = (state.iaveCustom || []).filter((e) => e.id !== editingIaveId);
+    delete state.iaveDone[editingIaveId];
+    saveState();
+    els.iaveModal.close();
+    renderIave();
+  }
+
   function renderIave() {
     els.iaveFilters.innerHTML = "";
     for (const key of ["ALL", "FQ", "MAT", "PORT"]) {
@@ -851,7 +957,7 @@
       els.iaveFilters.appendChild(btn);
     }
 
-    const exams = IAVE.filter((e) => e.id !== "iave-hub").filter(
+    const exams = getAllIaveExams().filter(
       (e) => iaveSubjectFilter === "ALL" || e.subject === iaveSubjectFilter,
     );
     const doneCount = exams.filter((e) => state.iaveDone[e.id]).length;
@@ -862,34 +968,50 @@
     if (hub) {
       const hubCard = document.createElement("article");
       hubCard.className = "tool-card";
-      hubCard.innerHTML = `<h3>Portal IAVE</h3><p>Se algum link direto falhar, usa o hub oficial.</p><a class="btn primary small" href="${hub.url}" target="_blank" rel="noopener">Abrir iave.pt</a>`;
+      hubCard.innerHTML = `<h3>Portal IAVE</h3><p>Abre o site oficial para copiar o link do enunciado e da correção.</p><a class="btn primary small" href="${hub.url}" target="_blank" rel="noopener">Abrir iave.pt</a>`;
       els.iaveList.appendChild(hubCard);
     }
 
     for (const exam of exams) {
       const done = !!state.iaveDone[exam.id];
+      const hasExam = !!exam.url;
+      const hasCorr = !!exam.correctionUrl;
       const card = document.createElement("article");
       card.className = `tool-card${done ? " done-exam" : ""}`;
       card.innerHTML = `
         <div class="tool-card-top">
           <span class="tag disc-${exam.subject}" style="color:#1c1917">${exam.subject}</span>
-          <span class="duration">${exam.phase || ""} ${exam.year || ""}</span>
+          <span class="duration">${escapeHtml([exam.phase, exam.year].filter(Boolean).join(" · "))}</span>
         </div>
         <h3>${escapeHtml(exam.label)}</h3>
+        ${!hasExam && !hasCorr ? `<p>Sem links — edita e cola o enunciado e a correção.</p>` : ""}
         <div class="task-actions">
           <label class="check-row tight">
-            <input type="checkbox" ${done ? "checked" : ""} data-iave="${exam.id}" />
+            <input type="checkbox" ${done ? "checked" : ""} />
             Já resolvi
           </label>
-          <a class="btn ghost small" href="${exam.url}" target="_blank" rel="noopener">Abrir prova</a>
+          <button type="button" class="btn ghost small" data-edit>Editar / links</button>
+        </div>
+        <div class="iave-links">
+          ${
+            hasExam
+              ? `<a class="btn primary small" href="${escapeAttr(exam.url)}" target="_blank" rel="noopener">Abrir exame</a>`
+              : `<button type="button" class="btn ghost small" disabled>Sem link do exame</button>`
+          }
+          ${
+            hasCorr
+              ? `<a class="btn ghost small" href="${escapeAttr(exam.correctionUrl)}" target="_blank" rel="noopener">Abrir correção</a>`
+              : `<button type="button" class="btn ghost small" disabled>Sem link da correção</button>`
+          }
         </div>
       `;
-      card.querySelector("input").addEventListener("change", (e) => {
+      card.querySelector('input[type="checkbox"]').addEventListener("change", (e) => {
         if (e.target.checked) state.iaveDone[exam.id] = true;
         else delete state.iaveDone[exam.id];
         saveState();
         renderIave();
       });
+      card.querySelector("[data-edit]").addEventListener("click", () => openIaveModal(exam));
       els.iaveList.appendChild(card);
     }
   }
@@ -1172,6 +1294,8 @@
     document.getElementById("btn-add-task").addEventListener("click", () => openModal(null));
     document.getElementById("btn-add-error").addEventListener("click", () => openErrorModal(null));
     document.getElementById("btn-manage-subjects").addEventListener("click", openSubjectModal);
+    document.getElementById("btn-add-iave").addEventListener("click", () => openIaveModal(null));
+    els.btnDeleteIave.addEventListener("click", deleteIaveExam);
 
     els.btnDelete.addEventListener("click", () => {
       if (!editingTaskId) return;
@@ -1197,6 +1321,12 @@
       if (e.submitter && e.submitter.value === "cancel") return;
       e.preventDefault();
       saveSubjectFromForm();
+    });
+    els.iaveForm.addEventListener("submit", (e) => {
+      if (e.submitter && e.submitter.value === "cancel") return;
+      e.preventDefault();
+      saveIaveFromForm();
+      els.iaveModal.close();
     });
   }
 

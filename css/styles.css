@@ -395,7 +395,16 @@ body {
 }
 .sims-table th { background: #1c1917; color: #fff; }
 .sims-table td:first-child, .sims-table th:first-child { text-align: left; }
-.iave-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.tools-header-actions {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+.iave-links {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+}
+.iave-links .btn:disabled,
+.iave-links a.btn.disabled {
+  opacity: 0.45; pointer-events: none;
+}
 a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 
 .modal-hint {
