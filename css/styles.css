@@ -5,13 +5,13 @@
   --muted: #78716c;
   --line: #e7e0d6;
   --shadow: 0 12px 40px rgba(28, 25, 23, 0.08);
-  --fis: #0b6bcb;
-  --mat: #0f7a45;
-  --port: #c2410c;
-  --qui: #0f766e;
-  --fq: #334155;
-  --prep: #57534e;
-  --desc: #64748b;
+  --fis: #7eb8de;
+  --mat: #7dcb9e;
+  --port: #e8a78a;
+  --qui: #6dbfb5;
+  --fq: #9aa8c4;
+  --prep: #c4b5a5;
+  --desc: #b5aed0;
   --radius: 14px;
   --font-display: "Outfit", system-ui, sans-serif;
   --font-body: "IBM Plex Sans", system-ui, sans-serif;
@@ -174,8 +174,8 @@ body {
   max-width: 100%;
   box-sizing: border-box;
   font-size: 0.68rem; line-height: 1.2; padding: 3px 6px; border-radius: 6px;
-  color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-weight: 500;
+  color: #1c1917; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 600;
 }
 .chip.done { opacity: 0.45; text-decoration: line-through; }
 .chip-more {

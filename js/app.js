@@ -12,8 +12,18 @@
   const BUILTIN_IDS = ["FIS", "MAT", "PORT", "QUI", "FQ", "PREP", "DESC"];
   const TYPES = Object.keys(DATA.typeLabels);
   const SUBJECT_COLORS = [
-    "#b45309", "#7c3aed", "#be185d", "#0369a1", "#15803d",
-    "#c2410c", "#0f766e", "#4338ca", "#a16207", "#334155",
+    "#7eb8de", // azul
+    "#7dcb9e", // verde
+    "#e8a78a", // pêssego
+    "#6dbfb5", // teal
+    "#c9a0dc", // lilás
+    "#f0c96a", // amarelo areia
+    "#f2a0b8", // rosa
+    "#9aa8c4", // azul-cinza
+    "#b5d46a", // lima
+    "#e8b060", // âmbar
+    "#a8d8d0", // menta
+    "#d4a574", // terracotta suave
   ];
 
   let state = loadState();
@@ -75,13 +85,13 @@
     const custom = (state.customSubjects || []).find((s) => s.id === id);
     if (custom?.color) return custom.color;
     const builtin = {
-      FIS: "#0b6bcb",
-      MAT: "#0f7a45",
-      PORT: "#c2410c",
-      QUI: "#0f766e",
-      FQ: "#334155",
-      PREP: "#57534e",
-      DESC: "#64748b",
+      FIS: "#7eb8de",
+      MAT: "#7dcb9e",
+      PORT: "#e8a78a",
+      QUI: "#6dbfb5",
+      FQ: "#9aa8c4",
+      PREP: "#c4b5a5",
+      DESC: "#b5aed0",
     };
     return builtin[id] || "#57534e";
   }
@@ -592,7 +602,7 @@
         <div>
           <h4>${escapeHtml(task.title)}</h4>
           <div class="task-meta">
-            <span class="tag ${discClass(task.discipline)}" style="color:#fff;${discInlineStyle(task.discipline)}">${escapeHtml(disciplineLabel(task.discipline))}</span>
+            <span class="tag ${discClass(task.discipline)}" style="color:#1c1917;${discInlineStyle(task.discipline)}">${escapeHtml(disciplineLabel(task.discipline))}</span>
             <span class="tag type">${escapeHtml(DATA.typeLabels[task.type] || task.type)}</span>
             ${task.duration ? `<span class="duration">${escapeHtml(task.duration)}</span>` : ""}
           </div>
@@ -745,7 +755,7 @@
       card.className = "tool-card";
       card.innerHTML = `
         <div class="tool-card-top">
-          <span class="tag ${discClass(err.discipline)}" style="color:#fff;${discInlineStyle(err.discipline)}">${escapeHtml(disciplineLabel(err.discipline))}</span>
+          <span class="tag ${discClass(err.discipline)}" style="color:#1c1917;${discInlineStyle(err.discipline)}">${escapeHtml(disciplineLabel(err.discipline))}</span>
           <span class="duration">${escapeHtml(err.date)}</span>
         </div>
         <h3>${escapeHtml(err.topic)}</h3>
@@ -786,7 +796,7 @@
       const pct = score != null && score !== "" ? Math.round((Number(score) / slot.max) * 100) : null;
       card.innerHTML = `
         <div class="tool-card-top">
-          <span class="tag disc-${slot.subject === "FQ" ? "FQ" : slot.subject}" style="color:#fff">${escapeHtml(slot.subject)}</span>
+          <span class="tag disc-${slot.subject === "FQ" ? "FQ" : slot.subject}" style="color:#1c1917">${escapeHtml(slot.subject)}</span>
           <span class="duration">Semana ${slot.week}</span>
         </div>
         <h3>${escapeHtml(slot.label)}</h3>
@@ -862,7 +872,7 @@
       card.className = `tool-card${done ? " done-exam" : ""}`;
       card.innerHTML = `
         <div class="tool-card-top">
-          <span class="tag disc-${exam.subject}" style="color:#fff">${exam.subject}</span>
+          <span class="tag disc-${exam.subject}" style="color:#1c1917">${exam.subject}</span>
           <span class="duration">${exam.phase || ""} ${exam.year || ""}</span>
         </div>
         <h3>${escapeHtml(exam.label)}</h3>
