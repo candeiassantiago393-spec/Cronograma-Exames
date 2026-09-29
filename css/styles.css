@@ -232,7 +232,19 @@ body {
 .task-card p {
   margin: 0; color: var(--muted); font-size: 0.86rem; line-height: 1.4; white-space: pre-wrap;
 }
-.task-actions { margin-top: 8px; display: flex; gap: 6px; }
+.task-actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.reorder-btns {
+  display: flex; flex-direction: column; gap: 2px; flex-shrink: 0;
+}
+.reorder-btn {
+  width: 28px; height: 28px; font-size: 0.85rem;
+  border: 1px solid var(--line); border-radius: 8px; background: #fff;
+}
+.reorder-btn:hover:not(:disabled) { background: #f5f1ea; }
+.reorder-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.task-card.drop-before {
+  box-shadow: inset 0 3px 0 #0f7a45;
+}
 .duration { font-size: 0.75rem; color: var(--muted); }
 
 .modal {
@@ -407,20 +419,38 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   outline: 2px solid #1c1917; outline-offset: 2px;
 }
 .subject-list-wrap {
-  padding: 0 20px 20px;
-  border-top: 1px solid var(--line);
-  margin-top: -4px;
+  padding: 0;
+  border-top: none;
+  margin: 0;
 }
-.subject-list-wrap h4 {
-  margin: 14px 0 8px; font-family: var(--font-display); font-size: 0.95rem;
+.subject-list-top { margin-bottom: 4px; }
+.subject-list-wrap h4, .modal-subhead {
+  margin: 8px 0; font-family: var(--font-display); font-size: 0.95rem;
 }
-.subject-list { display: flex; flex-direction: column; gap: 8px; }
+.modal-sep {
+  border: none; border-top: 1px solid var(--line); margin: 14px 0;
+}
+.subject-list { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
 .subject-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  flex-wrap: wrap;
 }
 .subject-row-left {
-  display: flex; align-items: center; gap: 8px; font-weight: 500;
+  display: flex; align-items: center; gap: 8px; font-weight: 500; min-width: 120px;
+}
+.subject-row-colors {
+  display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+}
+.subject-row .color-swatch {
+  width: 22px; height: 22px;
+}
+.subject-row-actions {
+  display: flex; gap: 6px; align-items: center; margin-left: auto;
+}
+.subject-row input[type="text"] {
+  font: inherit; border: 1px solid var(--line); border-radius: 8px;
+  padding: 4px 8px; max-width: 140px;
 }
 .chip-custom, .tag-custom {
   /* color set inline */

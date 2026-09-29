@@ -71,6 +71,9 @@
   }
 
   function disciplineColor(id) {
+    if (state.subjectColors?.[id]) return state.subjectColors[id];
+    const custom = (state.customSubjects || []).find((s) => s.id === id);
+    if (custom?.color) return custom.color;
     const builtin = {
       FIS: "#0b6bcb",
       MAT: "#0f7a45",
@@ -80,9 +83,7 @@
       PREP: "#57534e",
       DESC: "#64748b",
     };
-    if (builtin[id]) return builtin[id];
-    const custom = (state.customSubjects || []).find((s) => s.id === id);
-    return custom?.color || "#57534e";
+    return builtin[id] || "#57534e";
   }
 
   function discClass(id) {
@@ -90,7 +91,22 @@
   }
 
   function discInlineStyle(id) {
-    return BUILTIN_IDS.includes(id) ? "" : `background:${disciplineColor(id)}`;
+    return `background:${disciplineColor(id)}`;
+  }
+
+  function setDisciplineColor(id, color) {
+    if (BUILTIN_IDS.includes(id)) {
+      if (!state.subjectColors) state.subjectColors = {};
+      state.subjectColors[id] = color;
+    } else {
+      const custom = (state.customSubjects || []).find((s) => s.id === id);
+      if (custom) custom.color = color;
+    }
+    saveState();
+    renderSubjectList();
+    fillSelects();
+    renderAll();
+    if (selectedDate) openDay(selectedDate);
   }
 
   function parseISO(iso) {
@@ -152,6 +168,7 @@
       simScores: {},
       iaveDone: {},
       customSubjects: [],
+      subjectColors: {},
     };
   }
 
@@ -172,6 +189,7 @@
         simScores: parsed.simScores || {},
         iaveDone: parsed.iaveDone || {},
         customSubjects: parsed.customSubjects || [],
+        subjectColors: parsed.subjectColors || {},
       };
     } catch {
       return { tasksByDate: buildDefaultTasks(), done: {}, ...emptyStateExtras() };
@@ -188,6 +206,7 @@
         simScores: state.simScores,
         iaveDone: state.iaveDone,
         customSubjects: state.customSubjects || [],
+        subjectColors: state.subjectColors || {},
       }),
     );
   }
@@ -272,6 +291,35 @@
     if (!state.tasksByDate[toDate]) state.tasksByDate[toDate] = [];
     state.tasksByDate[toDate].push(task);
     saveState();
+  }
+
+  function reorderTask(taskId, direction) {
+    const iso = findDateOfTask(taskId);
+    if (!iso) return false;
+    const list = state.tasksByDate[iso];
+    if (!list) return false;
+    const idx = list.findIndex((t) => t.id === taskId);
+    const newIdx = idx + direction;
+    if (idx < 0 || newIdx < 0 || newIdx >= list.length) return false;
+    const [item] = list.splice(idx, 1);
+    list.splice(newIdx, 0, item);
+    saveState();
+    return true;
+  }
+
+  function reorderTaskBefore(taskId, beforeTaskId) {
+    const iso = findDateOfTask(taskId);
+    const iso2 = findDateOfTask(beforeTaskId);
+    if (!iso || iso !== iso2 || taskId === beforeTaskId) return false;
+    const list = state.tasksByDate[iso];
+    const fromIdx = list.findIndex((t) => t.id === taskId);
+    let toIdx = list.findIndex((t) => t.id === beforeTaskId);
+    if (fromIdx < 0 || toIdx < 0) return false;
+    const [item] = list.splice(fromIdx, 1);
+    if (fromIdx < toIdx) toIdx -= 1;
+    list.splice(toIdx, 0, item);
+    saveState();
+    return true;
   }
 
   function passFilter(task) {
@@ -495,19 +543,51 @@
   function renderTaskCard(task) {
     const li = document.createElement("li");
     const done = !!state.done[task.id];
+    const iso = findDateOfTask(task.id);
+    const fullList = iso ? allTasksFor(iso) : [];
+    const idx = fullList.findIndex((t) => t.id === task.id);
     li.className = `task-card${done ? " done" : ""}`;
+    li.dataset.taskId = task.id;
     li.draggable = true;
     li.addEventListener("dragstart", (e) => {
       dragTaskId = task.id;
       e.dataTransfer.setData("text/task-id", task.id);
       e.dataTransfer.effectAllowed = "move";
+      li.classList.add("dragging");
     });
     li.addEventListener("dragend", () => {
       dragTaskId = null;
+      li.classList.remove("dragging");
+    });
+    li.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      li.classList.add("drop-before");
+    });
+    li.addEventListener("dragleave", () => li.classList.remove("drop-before"));
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      li.classList.remove("drop-before");
+      const id = e.dataTransfer.getData("text/task-id") || dragTaskId;
+      if (!id || id === task.id) return;
+      const fromDate = findDateOfTask(id);
+      const toDate = findDateOfTask(task.id);
+      if (fromDate && toDate && fromDate === toDate) {
+        reorderTaskBefore(id, task.id);
+      } else if (toDate) {
+        moveTask(id, toDate);
+        reorderTaskBefore(id, task.id);
+      }
+      openDay(toDate || selectedDate);
+      renderCalendar();
     });
 
     li.innerHTML = `
       <div class="task-card-top">
+        <div class="reorder-btns">
+          <button type="button" class="icon-btn reorder-btn" data-up aria-label="Subir" ${idx <= 0 ? "disabled" : ""}>↑</button>
+          <button type="button" class="icon-btn reorder-btn" data-down aria-label="Descer" ${idx < 0 || idx >= fullList.length - 1 ? "disabled" : ""}>↓</button>
+        </div>
         <input type="checkbox" ${done ? "checked" : ""} aria-label="Marcar como feita" />
         <div>
           <h4>${escapeHtml(task.title)}</h4>
@@ -532,6 +612,20 @@
     });
     li.querySelector("[data-edit]").addEventListener("click", () => openModal(task));
     li.querySelector("[data-error]").addEventListener("click", () => openErrorModal(task));
+    li.querySelector("[data-up]").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (reorderTask(task.id, -1)) {
+        openDay(selectedDate);
+        renderCalendar();
+      }
+    });
+    li.querySelector("[data-down]").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (reorderTask(task.id, 1)) {
+        openDay(selectedDate);
+        renderCalendar();
+      }
+    });
     return li;
   }
 
@@ -812,44 +906,117 @@
   function renderSubjectList() {
     const list = els.subjectList;
     list.innerHTML = "";
-    const customs = state.customSubjects || [];
-    if (!customs.length) {
-      list.innerHTML = `<p class="empty-hint">Ainda não criaste matérias. Exemplos: Mat-aulas, Port-aulas, Bio-aulas.</p>`;
-      return;
-    }
-    for (const sub of customs) {
+    const ids = allDisciplineIds();
+
+    for (const id of ids) {
+      const isCustom = !BUILTIN_IDS.includes(id);
+      const currentColor = disciplineColor(id);
       const row = document.createElement("div");
       row.className = "subject-row";
-      row.innerHTML = `
-        <div class="subject-row-left">
-          <span class="legend-dot chip-custom" style="background:${sub.color}"></span>
-          ${escapeHtml(sub.label)}
-        </div>
-        <button type="button" class="btn danger ghost small" data-del>Apagar</button>
-      `;
-      row.querySelector("[data-del]").addEventListener("click", () => {
-        const used = Object.values(state.tasksByDate).some((tasks) =>
-          tasks.some((t) => t.discipline === sub.id),
-        );
-        const msg = used
-          ? `Apagar “${sub.label}”? As tarefas existentes passam para Preparação.`
-          : `Apagar “${sub.label}”?`;
-        if (!confirm(msg)) return;
-        if (used) {
-          for (const iso of Object.keys(state.tasksByDate)) {
-            for (const t of state.tasksByDate[iso]) {
-              if (t.discipline === sub.id) t.discipline = "PREP";
+
+      const left = document.createElement("div");
+      left.className = "subject-row-left";
+      const dot = document.createElement("span");
+      dot.className = "legend-dot";
+      dot.style.background = currentColor;
+      left.appendChild(dot);
+
+      if (isCustom) {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.maxLength = 40;
+        input.value = disciplineLabel(id);
+        input.title = "Renomear";
+        input.addEventListener("change", () => {
+          const next = input.value.trim();
+          if (!next) {
+            input.value = disciplineLabel(id);
+            return;
+          }
+          const duplicate = (state.customSubjects || []).some(
+            (s) => s.id !== id && s.label.toLowerCase() === next.toLowerCase(),
+          );
+          if (duplicate) {
+            alert("Já existe uma matéria com esse nome.");
+            input.value = disciplineLabel(id);
+            return;
+          }
+          const custom = state.customSubjects.find((s) => s.id === id);
+          if (custom) custom.label = next;
+          saveState();
+          fillSelects();
+          renderAll();
+        });
+        left.appendChild(input);
+      } else {
+        const name = document.createElement("span");
+        name.textContent = disciplineLabel(id);
+        left.appendChild(name);
+      }
+
+      const colors = document.createElement("div");
+      colors.className = "subject-row-colors";
+      for (const color of SUBJECT_COLORS) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `color-swatch${currentColor === color ? " selected" : ""}`;
+        btn.style.background = color;
+        btn.title = "Alterar cor";
+        btn.addEventListener("click", () => setDisciplineColor(id, color));
+        colors.appendChild(btn);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "subject-row-actions";
+      if (isCustom) {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "btn danger ghost small";
+        del.textContent = "Apagar";
+        del.addEventListener("click", () => {
+          const used = Object.values(state.tasksByDate).some((tasks) =>
+            tasks.some((t) => t.discipline === id),
+          );
+          const label = disciplineLabel(id);
+          const msg = used
+            ? `Apagar “${label}”? As tarefas existentes passam para Preparação.`
+            : `Apagar “${label}”?`;
+          if (!confirm(msg)) return;
+          if (used) {
+            for (const iso of Object.keys(state.tasksByDate)) {
+              for (const t of state.tasksByDate[iso]) {
+                if (t.discipline === id) t.discipline = "PREP";
+              }
             }
           }
-        }
-        state.customSubjects = state.customSubjects.filter((s) => s.id !== sub.id);
-        discFilter.delete(sub.id);
-        if (discFilter.size === 0) discFilter = new Set(allDisciplineIds());
-        saveState();
-        fillSelects();
-        renderSubjectList();
-        renderAll();
-      });
+          state.customSubjects = state.customSubjects.filter((s) => s.id !== id);
+          discFilter.delete(id);
+          if (discFilter.size === 0) discFilter = new Set(allDisciplineIds());
+          saveState();
+          fillSelects();
+          renderSubjectList();
+          renderAll();
+        });
+        actions.appendChild(del);
+      } else {
+        const reset = document.createElement("button");
+        reset.type = "button";
+        reset.className = "btn ghost small";
+        reset.textContent = "Cor original";
+        reset.title = "Repor cor padrão";
+        reset.addEventListener("click", () => {
+          if (state.subjectColors) delete state.subjectColors[id];
+          saveState();
+          renderSubjectList();
+          renderAll();
+          if (selectedDate) openDay(selectedDate);
+        });
+        actions.appendChild(reset);
+      }
+
+      row.appendChild(left);
+      row.appendChild(colors);
+      row.appendChild(actions);
       list.appendChild(row);
     }
   }
@@ -864,7 +1031,10 @@
 
   function saveSubjectFromForm() {
     const label = els.subjectForm.elements.label.value.trim();
-    if (!label) return;
+    if (!label) {
+      alert("Escreve o nome da nova matéria.");
+      return;
+    }
     const color = els.subjectForm.elements.color.value || selectedSubjectColor;
     const exists = (state.customSubjects || []).some(
       (s) => s.label.toLowerCase() === label.toLowerCase(),
