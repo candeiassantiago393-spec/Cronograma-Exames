@@ -11,6 +11,11 @@
 
   const BUILTIN_IDS = ["FIS", "MAT", "PORT", "QUI", "FQ", "PREP", "DESC"];
   const TYPES = Object.keys(DATA.typeLabels);
+  const DIFFICULTY_LABELS = {
+    facil: "Fácil",
+    medio: "Médio",
+    dificil: "Difícil",
+  };
   const SUBJECT_COLORS = [
     "#7eb8de", // azul
     "#7dcb9e", // verde
@@ -36,6 +41,7 @@
   let activeTab = "calendar";
   let discFilter = new Set(allDisciplineIds());
   let iaveSubjectFilter = "ALL";
+  let errorDiscFilter = "ALL";
   let dragTaskId = null;
   let selectedSubjectColor = SUBJECT_COLORS[0];
 
@@ -58,6 +64,7 @@
     errorModal: document.getElementById("error-modal"),
     errorForm: document.getElementById("error-form"),
     errorsList: document.getElementById("errors-list"),
+    errorFilters: document.getElementById("error-filters"),
     simsList: document.getElementById("sims-list"),
     simsChart: document.getElementById("sims-chart"),
     iaveList: document.getElementById("iave-list"),
@@ -429,8 +436,10 @@
     const style = discInlineStyle(task.discipline);
     if (style) el.setAttribute("style", style);
     el.draggable = true;
-    el.title = `${task.title} (arrasta para outro dia)`;
+    el.title = `${task.title}${task.difficulty ? ` · ${DIFFICULTY_LABELS[task.difficulty]}` : ""} (arrasta para outro dia)`;
     el.textContent = shortLabel(task);
+    if (task.difficulty === "dificil") el.classList.add("chip-hard");
+    if (task.difficulty === "facil") el.classList.add("chip-easy");
     el.addEventListener("dragstart", (e) => {
       dragTaskId = task.id;
       e.dataTransfer.setData("text/task-id", task.id);
@@ -616,6 +625,7 @@
           <div class="task-meta">
             <span class="tag ${discClass(task.discipline)}" style="color:#1c1917;${discInlineStyle(task.discipline)}">${escapeHtml(disciplineLabel(task.discipline))}</span>
             <span class="tag type">${escapeHtml(DATA.typeLabels[task.type] || task.type)}</span>
+            ${task.difficulty ? `<span class="tag diff-${task.difficulty}">${escapeHtml(DIFFICULTY_LABELS[task.difficulty] || task.difficulty)}</span>` : ""}
             ${task.duration ? `<span class="duration">${escapeHtml(task.duration)}</span>` : ""}
           </div>
           ${task.detail ? `<p>${escapeHtml(task.detail)}</p>` : ""}
@@ -679,6 +689,7 @@
       ? findDateOfTask(task.id) || selectedDate
       : selectedDate || toISO(new Date(viewYear, viewMonth, 1));
     els.form.elements.duration.value = task?.duration || "1h30–2h";
+    els.form.elements.difficulty.value = task?.difficulty || "";
     els.modal.showModal();
   }
 
@@ -693,6 +704,7 @@
       discipline: els.form.elements.discipline.value,
       type: els.form.elements.type.value,
       duration: els.form.elements.duration.value.trim() || "—",
+      difficulty: els.form.elements.difficulty.value || "",
     };
     if (editingTaskId) {
       const oldDate = findDateOfTask(editingTaskId);
@@ -756,13 +768,36 @@
   }
 
   function renderErrors() {
+    if (els.errorFilters) {
+      els.errorFilters.innerHTML = "";
+      const keys = ["ALL", ...allDisciplineIds()];
+      for (const key of keys) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `btn small${errorDiscFilter === key ? " primary" : " ghost"}`;
+        btn.textContent = key === "ALL" ? "Todas" : disciplineLabel(key);
+        btn.addEventListener("click", () => {
+          errorDiscFilter = key;
+          renderErrors();
+        });
+        els.errorFilters.appendChild(btn);
+      }
+    }
+
     const list = els.errorsList;
     list.innerHTML = "";
+    const filtered = (state.errors || []).filter(
+      (err) => errorDiscFilter === "ALL" || err.discipline === errorDiscFilter,
+    );
     if (!state.errors.length) {
       list.innerHTML = `<div class="empty-hint">Ainda sem erros registados. No calendário, abre uma tarefa e clica “Registar erro”.</div>`;
       return;
     }
-    for (const err of state.errors) {
+    if (!filtered.length) {
+      list.innerHTML = `<div class="empty-hint">Nenhum erro nesta disciplina.</div>`;
+      return;
+    }
+    for (const err of filtered) {
       const card = document.createElement("article");
       card.className = "tool-card";
       card.innerHTML = `
@@ -1186,6 +1221,81 @@
     renderAll();
   }
 
+  function exportBackup() {
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            version: 2,
+            exportedAt: new Date().toISOString(),
+            data: {
+              tasksByDate: state.tasksByDate,
+              done: state.done,
+              errors: state.errors,
+              simScores: state.simScores,
+              iaveDone: state.iaveDone,
+              customSubjects: state.customSubjects || [],
+              subjectColors: state.subjectColors || {},
+              iaveCustom: state.iaveCustom || [],
+              iaveOverrides: state.iaveOverrides || {},
+            },
+          },
+          null,
+          2,
+        ),
+      ],
+      { type: "application/json" },
+    );
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+    link.download = `cronograma-exames-backup-${stamp}.json`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  function importBackupFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        const data = parsed.data || parsed;
+        if (!data.tasksByDate || typeof data.tasksByDate !== "object") {
+          throw new Error("Ficheiro inválido");
+        }
+        if (
+          !confirm(
+            "Restaurar este backup? Substitui o progresso atual neste browser (tarefas, erros, IAVE, notas…).",
+          )
+        ) {
+          return;
+        }
+        state = {
+          tasksByDate: data.tasksByDate,
+          done: data.done || {},
+          errors: data.errors || [],
+          simScores: data.simScores || {},
+          iaveDone: data.iaveDone || {},
+          customSubjects: data.customSubjects || [],
+          subjectColors: data.subjectColors || {},
+          iaveCustom: data.iaveCustom || [],
+          iaveOverrides: data.iaveOverrides || {},
+        };
+        discFilter = new Set(allDisciplineIds());
+        saveState();
+        fillSelects();
+        renderAll();
+        if (selectedDate) openDay(selectedDate);
+        alert("Backup restaurado com sucesso.");
+      } catch (err) {
+        console.error(err);
+        alert("Não foi possível ler o ficheiro de backup.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
   function switchTab(tab) {
     activeTab = tab;
     document.querySelectorAll(".tab").forEach((b) => {
@@ -1285,6 +1395,15 @@
       openDay(toISO(now));
     });
     document.getElementById("btn-export").addEventListener("click", exportPng);
+    document.getElementById("btn-backup").addEventListener("click", exportBackup);
+    document.getElementById("btn-restore").addEventListener("click", () => {
+      document.getElementById("restore-file").click();
+    });
+    document.getElementById("restore-file").addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      importBackupFile(file);
+      e.target.value = "";
+    });
     document.getElementById("btn-close-panel").addEventListener("click", () => {
       selectedDate = null;
       els.sideContent.classList.add("hidden");

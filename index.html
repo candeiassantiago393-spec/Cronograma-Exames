@@ -30,6 +30,9 @@
           <h2 id="month-label">Outubro 2026</h2>
           <button type="button" class="icon-btn" id="btn-next" aria-label="Seguinte">›</button>
         </div>
+        <button type="button" class="btn ghost" id="btn-backup">Backup</button>
+        <button type="button" class="btn ghost" id="btn-restore">Restaurar</button>
+        <input type="file" id="restore-file" accept="application/json,.json" class="hidden" />
         <button type="button" class="btn primary" id="btn-export">Exportar (PNG)</button>
       </div>
     </header>
@@ -85,6 +88,7 @@
           </div>
           <button type="button" class="btn primary" id="btn-add-error">+ Erro</button>
         </div>
+        <div class="iave-filters" id="error-filters"></div>
         <div id="errors-list" class="cards-list"></div>
       </div>
     </section>
@@ -148,6 +152,14 @@
           <input type="text" name="duration" placeholder="ex: 1h30–2h" maxlength="40" />
         </label>
       </div>
+      <label>Dificuldade
+        <select name="difficulty">
+          <option value="">Sem classificação</option>
+          <option value="facil">Fácil</option>
+          <option value="medio">Médio</option>
+          <option value="dificil">Difícil</option>
+        </select>
+      </label>
       <div class="modal-actions">
         <button type="button" class="btn danger ghost" id="btn-delete-task">Apagar</button>
         <div class="modal-actions-right">

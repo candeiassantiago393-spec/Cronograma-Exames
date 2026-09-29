@@ -398,9 +398,11 @@ body {
 .tools-header-actions {
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
 }
-.iave-links {
-  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
-}
+.tag.diff-facil { background: #d8f3e0; color: #14532d; }
+.tag.diff-medio { background: #fef3c7; color: #92400e; }
+.tag.diff-dificil { background: #fde2e1; color: #9f1239; }
+.chip-hard { box-shadow: inset 3px 0 0 #e11d48; }
+.chip-easy { box-shadow: inset 3px 0 0 #16a34a; }
 .iave-links .btn:disabled,
 .iave-links a.btn.disabled {
   opacity: 0.45; pointer-events: none;
