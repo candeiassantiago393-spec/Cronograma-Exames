@@ -1577,8 +1577,50 @@
     };
   }
 
+  function countAllTasks(tasksByDate = state.tasksByDate) {
+    let n = 0;
+    for (const list of Object.values(tasksByDate || {})) n += (list || []).length;
+    return n;
+  }
+
+  function countUserTasks(tasksByDate = state.tasksByDate) {
+    let n = 0;
+    for (const list of Object.values(tasksByDate || {})) {
+      for (const t of list || []) if (isUserTask(t)) n += 1;
+    }
+    return n;
+  }
+
+  async function copyBackupToClipboard() {
+    const payload = buildBackupPayload();
+    const text = JSON.stringify(payload, null, 2);
+    const total = countAllTasks(payload.data.tasksByDate);
+    const customs = (payload.data.customSubjects || []).length;
+    const doneN = Object.keys(payload.data.done || {}).length;
+    try {
+      await navigator.clipboard.writeText(text);
+      alert(
+        `Backup copiado (${total} tarefas, ${customs} matérias extra, ${doneN} concluídas).\n\nNo GitHub: clica «Colar backup» e cola (Ctrl+V).`,
+      );
+      return true;
+    } catch {
+      // fallback: prompt select-all
+      prompt("Copia todo este texto (Ctrl+A, Ctrl+C) e no GitHub usa «Colar backup»:", text);
+      return false;
+    }
+  }
+
   function exportBackup() {
-    const blob = new Blob([JSON.stringify(buildBackupPayload(), null, 2)], {
+    const payload = buildBackupPayload();
+    const total = countAllTasks(payload.data.tasksByDate);
+    const customs = (payload.data.customSubjects || []).length;
+    const doneN = Object.keys(payload.data.done || {}).length;
+    // file:// muitas vezes bloqueia o download — preferir clipboard
+    if (location.protocol === "file:") {
+      copyBackupToClipboard();
+      return;
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
     });
     const link = document.createElement("a");
@@ -1587,14 +1629,9 @@
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
-  }
-
-  function countUserTasks() {
-    let n = 0;
-    for (const list of Object.values(state.tasksByDate || {})) {
-      for (const t of list || []) if (isUserTask(t)) n += 1;
-    }
-    return n;
+    alert(
+      `Backup guardado (${total} tarefas, ${customs} matérias extra, ${doneN} concluídas).\n\nNo GitHub: Restaurar (ficheiro) ou «Colar backup».`,
+    );
   }
 
   function hasLocalCustomizations() {
@@ -1621,16 +1658,16 @@
         Para teres a mesma versão no telemóvel/GitHub: clica <strong>Backup</strong> aqui → abre
         <em>candeiassantiago393-spec.github.io/Cronograma-Exames</em> → <strong>Restaurar</strong> com o ficheiro.</p>
         <div class="banner-actions">
-          <button type="button" class="btn primary small" data-banner-backup>Backup agora</button>
+          <button type="button" class="btn primary small" data-banner-backup>Copiar backup</button>
           <button type="button" class="btn ghost small" data-banner-dismiss>Entendi</button>
         </div>`;
     } else if (isOnline && !customized && !dismissed) {
       html = `
-        <p><strong>Começar do zero neste link?</strong> Se já tinhas o calendário no ficheiro local (ou noutro browser)
-        com tarefas e cores tuas, faz <strong>Backup</strong> lá e depois <strong>Restaurar</strong> aqui.
-        Neste endereço as alterações também ficam guardadas automaticamente.</p>
+        <p><strong>Ainda sem as tuas tarefas neste link.</strong> Na aba do ficheiro local clica <strong>Backup</strong>
+        (copia os dados) e aqui clica <strong>Colar backup</strong>. O download de ficheiro no file:// costuma falhar.</p>
         <div class="banner-actions">
-          <button type="button" class="btn primary small" data-banner-restore>Restaurar backup</button>
+          <button type="button" class="btn primary small" data-banner-paste>Colar backup</button>
+          <button type="button" class="btn ghost small" data-banner-restore>Restaurar ficheiro</button>
           <button type="button" class="btn ghost small" data-banner-dismiss>Já está</button>
         </div>`;
     }
@@ -1642,7 +1679,8 @@
     }
     box.classList.remove("hidden");
     box.innerHTML = html;
-    box.querySelector("[data-banner-backup]")?.addEventListener("click", exportBackup);
+    box.querySelector("[data-banner-backup]")?.addEventListener("click", () => copyBackupToClipboard());
+    box.querySelector("[data-banner-paste]")?.addEventListener("click", openPasteRestore);
     box.querySelector("[data-banner-restore]")?.addEventListener("click", () => {
       document.getElementById("restore-file")?.click();
     });
@@ -1650,6 +1688,43 @@
       localStorage.setItem("cronograma-storage-tip", "1");
       box.classList.add("hidden");
     });
+  }
+
+  function applyBackupData(data) {
+    // Restauração exacta — não substitui pelo plano oficial.
+    const tasksByDate = stripBarcaFromPlan(
+      stripDescansoFromPlan(JSON.parse(JSON.stringify(data.tasksByDate))),
+    );
+    const total = countAllTasks(tasksByDate);
+    if (total === 0) {
+      throw new Error("Backup sem tarefas");
+    }
+    state = {
+      tasksByDate,
+      done: data.done || {},
+      planVersion: data.planVersion || CURRENT_PLAN_VERSION,
+      recoveredFromV1: true,
+      errors: data.errors || [],
+      simScores: data.simScores || {},
+      iaveDone: data.iaveDone || {},
+      customSubjects: data.customSubjects || [],
+      subjectColors: data.subjectColors || {},
+      iaveCustom: data.iaveCustom || [],
+      iaveOverrides: data.iaveOverrides || {},
+      personalCategories: normalizePersonalCategories(data.personalCategories),
+    };
+    discFilter = new Set(allDisciplineIds());
+    personalCatFilter = "ALL";
+    localStorage.setItem("cronograma-storage-tip", "1");
+    saveState();
+    fillSelects();
+    renderAll();
+    if (selectedDate) openDay(selectedDate);
+    return {
+      total,
+      customs: (state.customSubjects || []).length,
+      doneN: Object.keys(state.done || {}).length,
+    };
   }
 
   function importBackupFile(file) {
@@ -1662,49 +1737,52 @@
         if (!data.tasksByDate || typeof data.tasksByDate !== "object") {
           throw new Error("Ficheiro inválido");
         }
+        const previewTotal = countAllTasks(data.tasksByDate);
+        const previewCustoms = (data.customSubjects || []).length;
         if (
           !confirm(
-            "Restaurar este backup? Substitui o progresso atual neste browser (tarefas, erros, IAVE, notas…).",
+            `Restaurar este backup?\n\n${previewTotal} tarefas · ${previewCustoms} matérias extra\n\nSubstitui o calendário actual neste browser.`,
           )
         ) {
           return;
         }
-        let tasksByDate = stripBarcaFromPlan(stripDescansoFromPlan(data.tasksByDate));
-        let done = data.done || {};
-        let planVersion = data.planVersion || 0;
-        if (planVersion < CURRENT_PLAN_VERSION) {
-          tasksByDate = mergePlanKeepingUserTasks(tasksByDate);
-          done = pruneDoneToExisting(tasksByDate, done);
-          planVersion = CURRENT_PLAN_VERSION;
-        }
-        state = {
-          tasksByDate,
-          done,
-          planVersion,
-          recoveredFromV1: true,
-          errors: data.errors || [],
-          simScores: data.simScores || {},
-          iaveDone: data.iaveDone || {},
-          customSubjects: data.customSubjects || [],
-          subjectColors: data.subjectColors || {},
-          iaveCustom: data.iaveCustom || [],
-          iaveOverrides: data.iaveOverrides || {},
-          personalCategories: normalizePersonalCategories(data.personalCategories),
-        };
-        discFilter = new Set(allDisciplineIds());
-        personalCatFilter = "ALL";
-        localStorage.setItem("cronograma-storage-tip", "1");
-        saveState();
-        fillSelects();
-        renderAll();
-        if (selectedDate) openDay(selectedDate);
-        alert("Backup restaurado com sucesso. A partir de agora usa só este link — as alterações guardam-se aqui.");
+        const stats = applyBackupData(data);
+        alert(
+          `Restaurado: ${stats.total} tarefas, ${stats.customs} matérias extra, ${stats.doneN} concluídas.\n\nUsa só este link daqui para a frente.`,
+        );
       } catch (err) {
         console.error(err);
-        alert("Não foi possível ler o ficheiro de backup.");
+        alert(
+          "Não foi possível restaurar. Confirma que escolheste o JSON do Backup feito na aba file:// (a que tem Mat-aulas / Biologia).",
+        );
       }
     };
     reader.readAsText(file);
+  }
+
+  function openPasteRestore() {
+    const raw = prompt(
+      "Cola aqui o conteúdo completo do ficheiro de backup (JSON), se o Restaurar por ficheiro falhar:",
+    );
+    if (raw == null || !raw.trim()) return;
+    try {
+      const parsed = JSON.parse(raw.trim());
+      const data = parsed.data || parsed;
+      if (!data.tasksByDate) throw new Error("inválido");
+      const previewTotal = countAllTasks(data.tasksByDate);
+      if (
+        !confirm(
+          `Restaurar JSON colado?\n\n${previewTotal} tarefas · ${(data.customSubjects || []).length} matérias extra`,
+        )
+      ) {
+        return;
+      }
+      const stats = applyBackupData(data);
+      alert(`Restaurado: ${stats.total} tarefas, ${stats.customs} matérias extra.`);
+    } catch (err) {
+      console.error(err);
+      alert("JSON inválido. Abre o .json no Bloco de notas, copia tudo e tenta de novo.");
+    }
   }
 
   function renderCatSwatches() {
@@ -2040,6 +2118,7 @@
     document.getElementById("btn-restore").addEventListener("click", () => {
       document.getElementById("restore-file").click();
     });
+    document.getElementById("btn-paste-restore")?.addEventListener("click", openPasteRestore);
     document.getElementById("restore-file").addEventListener("change", (e) => {
       const file = e.target.files?.[0];
       importBackupFile(file);
