@@ -4,6 +4,7 @@
   const IAVE = window.IAVE_EXAMS || [];
   const SIMS = window.SIMULACRO_SLOTS || [];
   const STORAGE_KEY = "cronograma-exames-v2";
+  const STORAGE_PREV_KEY = "cronograma-exames-v2-prev";
   const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
   const MONTHS = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -235,35 +236,44 @@
     return next;
   }
 
-  /** Injeta tarefas de utilizador de um mapa antigo noutro (sem duplicar ids). */
-  function injectUserTasks(targetMap, sourceMap) {
-    let added = 0;
-    const existingIds = new Set();
-    for (const list of Object.values(targetMap || {})) {
-      for (const t of list || []) existingIds.add(t.id);
-    }
-    for (const [iso, list] of Object.entries(sourceMap || {})) {
+  function scoreSavedPlan(parsed) {
+    if (!parsed?.tasksByDate) return -1;
+    let userTasks = 0;
+    let total = 0;
+    for (const list of Object.values(parsed.tasksByDate)) {
       for (const t of list || []) {
-        if (!isUserTask(t) || existingIds.has(t.id)) continue;
-        if (!targetMap[iso]) targetMap[iso] = [];
-        targetMap[iso].push(t);
-        existingIds.add(t.id);
-        added += 1;
+        total += 1;
+        if (isUserTask(t)) userTasks += 1;
       }
     }
-    return added;
+    const customs = (parsed.customSubjects || []).length;
+    const colors = Object.keys(parsed.subjectColors || {}).length;
+    const doneN = Object.keys(parsed.done || {}).length;
+    return userTasks * 100 + customs * 50 + colors * 10 + doneN * 2 + total;
   }
 
-  function tryRecoverUserTasksFromLegacy(tasksByDate) {
+  function readStoredPlan(key) {
     try {
-      const raw = localStorage.getItem("cronograma-exames-v1");
-      if (!raw) return 0;
-      const parsed = JSON.parse(raw);
-      if (!parsed?.tasksByDate) return 0;
-      return injectUserTasks(tasksByDate, parsed.tasksByDate);
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      return JSON.parse(raw);
     } catch {
-      return 0;
+      return null;
     }
+  }
+
+  /** Escolhe a cópia mais “rica” (customs / feitos / tarefas tuas). */
+  function pickRichestPlan(...candidates) {
+    let best = null;
+    let bestScore = -1;
+    for (const c of candidates) {
+      const s = scoreSavedPlan(c);
+      if (s > bestScore) {
+        best = c;
+        bestScore = s;
+      }
+    }
+    return best;
   }
 
   function pruneDoneToExisting(tasksByDate, done) {
@@ -325,91 +335,95 @@
     return tasksByDate;
   }
 
+  function hydrateFromParsed(parsed, notice = null) {
+    const tasksByDate =
+      parsed.tasksByDate && Object.keys(parsed.tasksByDate).length
+        ? stripBarcaFromPlan(stripDescansoFromPlan(parsed.tasksByDate))
+        : buildDefaultTasks();
+    return {
+      tasksByDate,
+      done: parsed.done || {},
+      planVersion: parsed.planVersion || CURRENT_PLAN_VERSION,
+      recoveredFromV1: true,
+      notice,
+      errors: parsed.errors || [],
+      simScores: parsed.simScores || {},
+      iaveDone: parsed.iaveDone || {},
+      customSubjects: parsed.customSubjects || [],
+      subjectColors: parsed.subjectColors || {},
+      iaveCustom: parsed.iaveCustom || [],
+      iaveOverrides: parsed.iaveOverrides || {},
+      personalCategories: normalizePersonalCategories(parsed.personalCategories),
+    };
+  }
+
   function loadState() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("cronograma-exames-v1");
-      if (!raw) {
+      const current = readStoredPlan(STORAGE_KEY);
+      const prev = readStoredPlan(STORAGE_PREV_KEY);
+      const legacy = readStoredPlan("cronograma-exames-v1");
+
+      if (!current && !prev && !legacy) {
         return {
           tasksByDate: buildDefaultTasks(),
           done: {},
           planVersion: CURRENT_PLAN_VERSION,
+          recoveredFromV1: true,
           ...emptyStateExtras(),
         };
       }
-      const parsed = JSON.parse(raw);
-      let tasksByDate =
-        parsed.tasksByDate && Object.keys(parsed.tasksByDate).length
-          ? stripBarcaFromPlan(stripDescansoFromPlan(parsed.tasksByDate))
-          : buildDefaultTasks();
-      let done = parsed.done || {};
-      let planVersion = parsed.planVersion || 0;
-      let notice = null;
 
-      // Atualiza só o plano oficial; nunca apaga tarefas que tu criaste.
-      if (planVersion < CURRENT_PLAN_VERSION) {
-        tasksByDate = mergePlanKeepingUserTasks(tasksByDate);
-        done = pruneDoneToExisting(tasksByDate, done);
-        planVersion = CURRENT_PLAN_VERSION;
-        notice = "updated";
-      }
+      // NUNCA substitui o calendário pelo plano oficial no load.
+      // Se um refresh/update antigo estragou dados, recupera a cópia mais rica.
+      const richest = pickRichestPlan(current, prev, legacy);
+      const notice =
+        richest && current && richest !== current && scoreSavedPlan(richest) > scoreSavedPlan(current) + 20
+          ? "recovered"
+          : null;
 
-      // Recuperação one-shot: update v3 podia ter apagado customs — tenta backup v1.
-      let recoveredFromV1 = !!parsed.recoveredFromV1;
-      if (!recoveredFromV1) {
-        const recovered = tryRecoverUserTasksFromLegacy(tasksByDate);
-        recoveredFromV1 = true;
-        if (recovered > 0) {
-          done = pruneDoneToExisting(tasksByDate, {
-            ...done,
-            ...(parsed.done || {}),
-          });
-          notice = "recovered";
-        }
-      }
-
-      return {
-        tasksByDate,
-        done,
-        planVersion,
-        recoveredFromV1,
-        notice,
-        errors: parsed.errors || [],
-        simScores: parsed.simScores || {},
-        iaveDone: parsed.iaveDone || {},
-        customSubjects: parsed.customSubjects || [],
-        subjectColors: parsed.subjectColors || {},
-        iaveCustom: parsed.iaveCustom || [],
-        iaveOverrides: parsed.iaveOverrides || {},
-        personalCategories: normalizePersonalCategories(parsed.personalCategories),
-      };
+      return hydrateFromParsed(richest || current || prev || legacy, notice);
     } catch {
       return {
         tasksByDate: buildDefaultTasks(),
         done: {},
         planVersion: CURRENT_PLAN_VERSION,
+        recoveredFromV1: true,
         ...emptyStateExtras(),
       };
     }
   }
 
+  function serializeState() {
+    return JSON.stringify({
+      tasksByDate: state.tasksByDate,
+      done: state.done,
+      planVersion: state.planVersion || CURRENT_PLAN_VERSION,
+      recoveredFromV1: true,
+      errors: state.errors,
+      simScores: state.simScores,
+      iaveDone: state.iaveDone,
+      customSubjects: state.customSubjects || [],
+      subjectColors: state.subjectColors || {},
+      iaveCustom: state.iaveCustom || [],
+      iaveOverrides: state.iaveOverrides || {},
+      personalCategories: state.personalCategories || [],
+    });
+  }
+
   function saveState() {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        tasksByDate: state.tasksByDate,
-        done: state.done,
-        planVersion: state.planVersion || CURRENT_PLAN_VERSION,
-        recoveredFromV1: !!state.recoveredFromV1,
-        errors: state.errors,
-        simScores: state.simScores,
-        iaveDone: state.iaveDone,
-        customSubjects: state.customSubjects || [],
-        subjectColors: state.subjectColors || {},
-        iaveCustom: state.iaveCustom || [],
-        iaveOverrides: state.iaveOverrides || {},
-        personalCategories: state.personalCategories || [],
-      }),
-    );
+    try {
+      const existing = localStorage.getItem(STORAGE_KEY);
+      if (existing) {
+        const incoming = serializeState();
+        // Só arquiva se o estado actual for diferente (evita sobrescrever o "bom" com o "mau" duas vezes)
+        if (existing !== incoming) {
+          localStorage.setItem(STORAGE_PREV_KEY, existing);
+        }
+      }
+    } catch {
+      /* ignore quota */
+    }
+    localStorage.setItem(STORAGE_KEY, serializeState());
   }
 
   function resetToPlan() {
@@ -426,6 +440,23 @@
     saveState();
     renderAll();
     if (selectedDate) openDay(selectedDate);
+  }
+
+  function restorePreviousSave() {
+    const prev = readStoredPlan(STORAGE_PREV_KEY);
+    if (!prev?.tasksByDate) {
+      alert("Não há cópia anterior guardada neste browser.");
+      return;
+    }
+    if (
+      !confirm(
+        `Restaurar a cópia anterior?\n\n${countAllTasks(prev.tasksByDate)} tarefas · ${(prev.customSubjects || []).length} matérias extra`,
+      )
+    ) {
+      return;
+    }
+    const stats = applyBackupData(prev);
+    alert(`Cópia anterior restaurada: ${stats.total} tarefas, ${stats.customs} matérias extra.`);
   }
 
   function isPersonal(task) {
@@ -1654,11 +1685,11 @@
     let html = "";
     if (isFile && customized) {
       html = `
-        <p><strong>Estás no ficheiro local.</strong> As tuas cores, tarefas e progresso ficam só nesta aba.
-        Para teres a mesma versão no telemóvel/GitHub: clica <strong>Backup</strong> aqui → abre
-        <em>candeiassantiago393-spec.github.io/Cronograma-Exames</em> → <strong>Restaurar</strong> com o ficheiro.</p>
+        <p><strong>Estás no ficheiro local.</strong> Antes de refresh ou fechar: <strong>Backup</strong> (copia os dados).
+        Depois no GitHub usa <strong>Colar backup</strong>. O calendário já não se altera sozinho ao recarregar.</p>
         <div class="banner-actions">
           <button type="button" class="btn primary small" data-banner-backup>Copiar backup</button>
+          <button type="button" class="btn ghost small" data-banner-undo>Desfazer save</button>
           <button type="button" class="btn ghost small" data-banner-dismiss>Entendi</button>
         </div>`;
     } else if (isOnline && !customized && !dismissed) {
@@ -1681,6 +1712,7 @@
     box.innerHTML = html;
     box.querySelector("[data-banner-backup]")?.addEventListener("click", () => copyBackupToClipboard());
     box.querySelector("[data-banner-paste]")?.addEventListener("click", openPasteRestore);
+    box.querySelector("[data-banner-undo]")?.addEventListener("click", restorePreviousSave);
     box.querySelector("[data-banner-restore]")?.addEventListener("click", () => {
       document.getElementById("restore-file")?.click();
     });
@@ -2119,6 +2151,7 @@
       document.getElementById("restore-file").click();
     });
     document.getElementById("btn-paste-restore")?.addEventListener("click", openPasteRestore);
+    document.getElementById("btn-undo-save")?.addEventListener("click", restorePreviousSave);
     document.getElementById("restore-file").addEventListener("change", (e) => {
       const file = e.target.files?.[0];
       importBackupFile(file);
@@ -2186,17 +2219,17 @@
     });
   }
 
-  // init
-  if (state.notice) {
-    const msg =
-      state.notice === "recovered"
-        ? "Recuperei tarefas tuas a partir de uma cópia antiga neste browser. Confirma se está tudo."
-        : "Plano oficial atualizado. As tarefas que tu adicionaste mantêm-se.";
+  // init — NÃO grava no load (isso já destruiu dados no passado).
+  if (state.notice === "recovered") {
     delete state.notice;
     saveState();
-    setTimeout(() => alert(msg), 300);
+    setTimeout(() => {
+      alert(
+        "Recuperei uma cópia anterior do teu calendário neste browser (tarefas/cores/feitos). Confirma se está correcto e faz Backup.",
+      );
+    }, 300);
   } else {
-    saveState();
+    delete state.notice;
   }
   fillSelects();
   document.querySelectorAll(".view-btn").forEach((b) => {

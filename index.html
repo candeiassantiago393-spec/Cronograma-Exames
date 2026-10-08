@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css?v=8" />
+  <link rel="stylesheet" href="css/styles.css?v=9" />
 </head>
 <body>
   <div class="app">
@@ -33,6 +33,7 @@
         <button type="button" class="btn ghost" id="btn-backup">Backup</button>
         <button type="button" class="btn ghost" id="btn-restore">Restaurar</button>
         <button type="button" class="btn ghost" id="btn-paste-restore" title="Colar JSON do backup">Colar backup</button>
+        <button type="button" class="btn ghost" id="btn-undo-save" title="Voltar à cópia anterior neste browser">Desfazer save</button>
         <input type="file" id="restore-file" accept="application/json,.json" class="hidden" />
         <button type="button" class="btn primary" id="btn-export">Exportar (PNG)</button>
       </div>
@@ -336,8 +337,8 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <script src="js/data.js?v=8"></script>
-  <script src="js/extras.js?v=8"></script>
-  <script src="js/app.js?v=8"></script>
+  <script src="js/data.js?v=9"></script>
+  <script src="js/extras.js?v=9"></script>
+  <script src="js/app.js?v=9"></script>
 </body>
 </html>
