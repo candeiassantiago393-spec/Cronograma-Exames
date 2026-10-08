@@ -1,5 +1,6 @@
 (() => {
   const DATA = window.CRONOGRAMA_DATA;
+  const CURRENT_PLAN_VERSION = DATA.planVersion || 1;
   const IAVE = window.IAVE_EXAMS || [];
   const SIMS = window.SIMULACRO_SLOTS || [];
   const STORAGE_KEY = "cronograma-exames-v2";
@@ -177,8 +178,6 @@
   function uid(prefix = "t") {
     return `${prefix}_${Math.random().toString(36).slice(2, 9)}_${Date.now().toString(36)}`;
   }
-
-  const CURRENT_PLAN_VERSION = DATA.planVersion || 1;
 
   function buildDefaultTasks() {
     const map = {};
