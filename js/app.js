@@ -31,12 +31,12 @@
     "#d4a574", // terracotta suave
   ];
 
-  const PERSONAL_CATEGORIES = {
-    beleza: { label: "Beleza", color: "#f2a0b8" },
-    trabalho: { label: "Trabalho", color: "#9aa8c4" },
-    treinos: { label: "Treinos", color: "#7dcb9e" },
-    eventos: { label: "Eventos", color: "#e8b060" },
-  };
+  const DEFAULT_PERSONAL_CATEGORIES = [
+    { id: "beleza", label: "Beleza", color: "#f2a0b8" },
+    { id: "trabalho", label: "Trabalho", color: "#9aa8c4" },
+    { id: "treinos", label: "Treinos", color: "#7dcb9e" },
+    { id: "eventos", label: "Eventos", color: "#e8b060" },
+  ];
 
   let state = loadState();
   let viewMode = window.matchMedia("(max-width: 900px)").matches ? "week" : "month";
@@ -53,6 +53,7 @@
   let errorDiscFilter = "ALL";
   let dragTaskId = null;
   let selectedSubjectColor = SUBJECT_COLORS[0];
+  let selectedCatColor = SUBJECT_COLORS[6];
   let modalScopeDefault = "study";
 
   const els = {
@@ -86,6 +87,10 @@
     subjectForm: document.getElementById("subject-form"),
     subjectList: document.getElementById("subject-list"),
     colorSwatches: document.getElementById("color-swatches"),
+    categoryModal: document.getElementById("category-modal"),
+    categoryForm: document.getElementById("category-form"),
+    categoryList: document.getElementById("category-list"),
+    catColorSwatches: document.getElementById("cat-color-swatches"),
     iaveModal: document.getElementById("iave-modal"),
     iaveForm: document.getElementById("iave-form"),
     iaveModalTitle: document.getElementById("iave-modal-title"),
@@ -207,13 +212,38 @@
       subjectColors: {},
       iaveCustom: [],
       iaveOverrides: {},
+      personalCategories: DEFAULT_PERSONAL_CATEGORIES.map((c) => ({ ...c })),
     };
+  }
+
+  function normalizePersonalCategories(list) {
+    if (Array.isArray(list) && list.length) {
+      return list
+        .filter((c) => c && c.id && c.label)
+        .map((c) => ({
+          id: String(c.id),
+          label: String(c.label).slice(0, 40),
+          color: c.color || SUBJECT_COLORS[0],
+        }));
+    }
+    return DEFAULT_PERSONAL_CATEGORIES.map((c) => ({ ...c }));
   }
 
   function stripDescansoFromPlan(tasksByDate) {
     for (const iso of Object.keys(tasksByDate || {})) {
       tasksByDate[iso] = (tasksByDate[iso] || []).filter(
         (t) => t.discipline !== "DESC" && t.type !== "descanso",
+      );
+      if (!tasksByDate[iso].length) delete tasksByDate[iso];
+    }
+    return tasksByDate;
+  }
+
+  /** Remove Auto da Barca (não é AE do secundário) de planos já guardados. */
+  function stripBarcaFromPlan(tasksByDate) {
+    for (const iso of Object.keys(tasksByDate || {})) {
+      tasksByDate[iso] = (tasksByDate[iso] || []).filter(
+        (t) => !/auto da barca/i.test(t.title || "") && !/barca do inferno/i.test(t.title || ""),
       );
       if (!tasksByDate[iso].length) delete tasksByDate[iso];
     }
@@ -229,7 +259,7 @@
       const parsed = JSON.parse(raw);
       const tasksByDate =
         parsed.tasksByDate && Object.keys(parsed.tasksByDate).length
-          ? stripDescansoFromPlan(parsed.tasksByDate)
+          ? stripBarcaFromPlan(stripDescansoFromPlan(parsed.tasksByDate))
           : buildDefaultTasks();
       return {
         tasksByDate,
@@ -241,6 +271,7 @@
         subjectColors: parsed.subjectColors || {},
         iaveCustom: parsed.iaveCustom || [],
         iaveOverrides: parsed.iaveOverrides || {},
+        personalCategories: normalizePersonalCategories(parsed.personalCategories),
       };
     } catch {
       return { tasksByDate: buildDefaultTasks(), done: {}, ...emptyStateExtras() };
@@ -260,6 +291,7 @@
         subjectColors: state.subjectColors || {},
         iaveCustom: state.iaveCustom || [],
         iaveOverrides: state.iaveOverrides || {},
+        personalCategories: state.personalCategories || [],
       }),
     );
   }
@@ -277,12 +309,24 @@
     return task?.scope === "personal";
   }
 
+  function personalCategories() {
+    return state.personalCategories || [];
+  }
+
+  function findPersonalCategory(id) {
+    return personalCategories().find((c) => c.id === id);
+  }
+
   function personalCategoryLabel(cat) {
-    return PERSONAL_CATEGORIES[cat]?.label || cat || "Pessoal";
+    return findPersonalCategory(cat)?.label || cat || "Pessoal";
   }
 
   function personalCategoryColor(cat) {
-    return PERSONAL_CATEGORIES[cat]?.color || "#c9a0dc";
+    return findPersonalCategory(cat)?.color || "#c9a0dc";
+  }
+
+  function defaultPersonalCategoryId() {
+    return personalCategories()[0]?.id || "eventos";
   }
 
   function taskChipColor(task) {
@@ -793,6 +837,19 @@
     els.form.elements.type.innerHTML = TYPES.map(
       (t) => `<option value="${t}">${DATA.typeLabels[t]}</option>`,
     ).join("");
+    fillCategorySelect();
+  }
+
+  function fillCategorySelect(preferred) {
+    const sel = els.form.elements.category;
+    if (!sel) return;
+    const cats = personalCategories();
+    const current = preferred || sel.value;
+    sel.innerHTML = cats
+      .map((c) => `<option value="${escapeAttr(c.id)}">${escapeHtml(c.label)}</option>`)
+      .join("");
+    if (cats.some((c) => c.id === current)) sel.value = current;
+    else if (cats.length) sel.value = cats[0].id;
   }
 
   function setModalScopeFields(scope) {
@@ -822,7 +879,8 @@
     els.form.elements.detail.value = task?.detail || "";
     els.form.elements.discipline.value = task?.discipline || "FIS";
     els.form.elements.type.value = task?.type || "estudo";
-    els.form.elements.category.value = task?.category || "eventos";
+    fillCategorySelect(task?.category || defaultPersonalCategoryId());
+    els.form.elements.category.value = task?.category || defaultPersonalCategoryId();
     els.form.elements.date.value = task
       ? findDateOfTask(task.id) || selectedDate
       : selectedDate || toISO(new Date(viewYear, viewMonth, 1));
@@ -844,7 +902,7 @@
             scope: "personal",
             title,
             detail: els.form.elements.detail.value.trim(),
-            category: els.form.elements.category.value || "eventos",
+            category: els.form.elements.category.value || defaultPersonalCategoryId(),
             duration: els.form.elements.duration.value.trim() || "—",
             discipline: "PES",
             type: "pessoal",
@@ -1392,6 +1450,7 @@
               subjectColors: state.subjectColors || {},
               iaveCustom: state.iaveCustom || [],
               iaveOverrides: state.iaveOverrides || {},
+              personalCategories: state.personalCategories || [],
             },
           },
           null,
@@ -1426,7 +1485,7 @@
           return;
         }
         state = {
-          tasksByDate: data.tasksByDate,
+          tasksByDate: stripBarcaFromPlan(stripDescansoFromPlan(data.tasksByDate)),
           done: data.done || {},
           errors: data.errors || [],
           simScores: data.simScores || {},
@@ -1435,8 +1494,10 @@
           subjectColors: data.subjectColors || {},
           iaveCustom: data.iaveCustom || [],
           iaveOverrides: data.iaveOverrides || {},
+          personalCategories: normalizePersonalCategories(data.personalCategories),
         };
         discFilter = new Set(allDisciplineIds());
+        personalCatFilter = "ALL";
         saveState();
         fillSelects();
         renderAll();
@@ -1450,15 +1511,171 @@
     reader.readAsText(file);
   }
 
+  function renderCatSwatches() {
+    if (!els.catColorSwatches || !els.categoryForm) return;
+    els.catColorSwatches.innerHTML = "";
+    for (const color of SUBJECT_COLORS) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `color-swatch${selectedCatColor === color ? " selected" : ""}`;
+      btn.style.background = color;
+      btn.setAttribute("aria-label", color);
+      btn.addEventListener("click", () => {
+        selectedCatColor = color;
+        els.categoryForm.elements.color.value = color;
+        renderCatSwatches();
+      });
+      els.catColorSwatches.appendChild(btn);
+    }
+    els.categoryForm.elements.color.value = selectedCatColor;
+  }
+
+  function setPersonalCategoryColor(id, color) {
+    const cat = findPersonalCategory(id);
+    if (!cat) return;
+    cat.color = color;
+    saveState();
+    fillCategorySelect();
+    renderCategoryList();
+    renderAll();
+    if (selectedDate) openDay(selectedDate);
+  }
+
+  function renderCategoryList() {
+    if (!els.categoryList) return;
+    els.categoryList.innerHTML = "";
+    for (const cat of personalCategories()) {
+      const row = document.createElement("div");
+      row.className = "subject-row";
+
+      const left = document.createElement("div");
+      left.className = "subject-row-left";
+      const dot = document.createElement("span");
+      dot.className = "legend-dot";
+      dot.style.background = cat.color;
+      left.appendChild(dot);
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.maxLength = 40;
+      input.value = cat.label;
+      input.title = "Renomear";
+      input.addEventListener("change", () => {
+        const next = input.value.trim();
+        if (!next) {
+          input.value = cat.label;
+          return;
+        }
+        const duplicate = personalCategories().some(
+          (c) => c.id !== cat.id && c.label.toLowerCase() === next.toLowerCase(),
+        );
+        if (duplicate) {
+          alert("Já existe uma categoria com esse nome.");
+          input.value = cat.label;
+          return;
+        }
+        cat.label = next;
+        saveState();
+        fillCategorySelect();
+        renderAll();
+      });
+      left.appendChild(input);
+
+      const colors = document.createElement("div");
+      colors.className = "subject-row-colors";
+      for (const color of SUBJECT_COLORS) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `color-swatch${cat.color === color ? " selected" : ""}`;
+        btn.style.background = color;
+        btn.title = "Alterar cor";
+        btn.addEventListener("click", () => setPersonalCategoryColor(cat.id, color));
+        colors.appendChild(btn);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "subject-row-actions";
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "btn danger ghost small";
+      del.textContent = "Apagar";
+      del.disabled = personalCategories().length <= 1;
+      del.title = personalCategories().length <= 1 ? "Mantém pelo menos uma categoria" : "Apagar";
+      del.addEventListener("click", () => {
+        if (personalCategories().length <= 1) return;
+        const used = Object.values(state.tasksByDate).some((tasks) =>
+          tasks.some((t) => isPersonal(t) && t.category === cat.id),
+        );
+        const fallback = personalCategories().find((c) => c.id !== cat.id);
+        const msg = used
+          ? `Apagar “${cat.label}”? As tarefas passam para “${fallback.label}”.`
+          : `Apagar “${cat.label}”?`;
+        if (!confirm(msg)) return;
+        if (used && fallback) {
+          for (const iso of Object.keys(state.tasksByDate)) {
+            for (const t of state.tasksByDate[iso]) {
+              if (isPersonal(t) && t.category === cat.id) t.category = fallback.id;
+            }
+          }
+        }
+        state.personalCategories = personalCategories().filter((c) => c.id !== cat.id);
+        if (personalCatFilter === cat.id) personalCatFilter = "ALL";
+        saveState();
+        fillCategorySelect();
+        renderCategoryList();
+        renderAll();
+      });
+      actions.appendChild(del);
+
+      row.appendChild(left);
+      row.appendChild(colors);
+      row.appendChild(actions);
+      els.categoryList.appendChild(row);
+    }
+  }
+
+  function openCategoryModal() {
+    if (!els.categoryModal) return;
+    els.categoryForm.elements.label.value = "";
+    selectedCatColor = SUBJECT_COLORS[Math.floor(Math.random() * SUBJECT_COLORS.length)];
+    renderCatSwatches();
+    renderCategoryList();
+    els.categoryModal.showModal();
+  }
+
+  function saveCategoryFromForm() {
+    const label = els.categoryForm.elements.label.value.trim();
+    if (!label) {
+      alert("Escreve o nome da nova categoria.");
+      return;
+    }
+    const color = els.categoryForm.elements.color.value || selectedCatColor;
+    const exists = personalCategories().some(
+      (c) => c.label.toLowerCase() === label.toLowerCase(),
+    );
+    if (exists) {
+      alert("Já existe uma categoria com esse nome.");
+      return;
+    }
+    if (!state.personalCategories) state.personalCategories = [];
+    state.personalCategories.push({ id: uid("cat"), label, color });
+    saveState();
+    fillCategorySelect();
+    els.categoryForm.elements.label.value = "";
+    renderCategoryList();
+    renderAll();
+  }
+
   function renderPersonalPanel() {
     if (!els.personalList) return;
     if (els.personalCatFilters) {
       els.personalCatFilters.innerHTML = "";
-      for (const key of ["ALL", ...Object.keys(PERSONAL_CATEGORIES)]) {
+      const keys = ["ALL", ...personalCategories().map((c) => c.id)];
+      for (const key of keys) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = `btn small${personalCatFilter === key ? " primary" : " ghost"}`;
-        btn.textContent = key === "ALL" ? "Todas" : PERSONAL_CATEGORIES[key].label;
+        btn.textContent = key === "ALL" ? "Todas" : personalCategoryLabel(key);
         btn.addEventListener("click", () => {
           personalCatFilter = key;
           renderPersonalPanel();
@@ -1473,7 +1690,7 @@
     for (const [iso, list] of Object.entries(state.tasksByDate)) {
       for (const task of list) {
         if (!isPersonal(task)) continue;
-        if (personalCatFilter !== "ALL" && (task.category || "eventos") !== personalCatFilter) continue;
+        if (personalCatFilter !== "ALL" && (task.category || defaultPersonalCategoryId()) !== personalCatFilter) continue;
         items.push({ iso, task });
       }
     }
@@ -1649,6 +1866,7 @@
       modalScopeDefault = "personal";
       openModal(null, "personal");
     });
+    document.getElementById("btn-manage-categories")?.addEventListener("click", openCategoryModal);
     document.getElementById("btn-add-error").addEventListener("click", () => openErrorModal(null));
     document.getElementById("btn-manage-subjects").addEventListener("click", openSubjectModal);
     document.getElementById("btn-add-iave").addEventListener("click", () => openIaveModal(null));
@@ -1678,6 +1896,11 @@
       if (e.submitter && e.submitter.value === "cancel") return;
       e.preventDefault();
       saveSubjectFromForm();
+    });
+    els.categoryForm?.addEventListener("submit", (e) => {
+      if (e.submitter && e.submitter.value === "cancel") return;
+      e.preventDefault();
+      saveCategoryFromForm();
     });
     els.iaveForm.addEventListener("submit", (e) => {
       if (e.submitter && e.submitter.value === "cancel") return;

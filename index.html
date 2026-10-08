@@ -88,9 +88,12 @@
         <div class="tools-header">
           <div>
             <h2>Tarefas pessoais</h2>
-            <p>Beleza, trabalho, treinos, eventos — no mesmo calendário, com filtro próprio.</p>
+            <p>Categorias editáveis (cores e nomes) — no mesmo calendário, com filtro próprio.</p>
           </div>
-          <button type="button" class="btn primary" id="btn-add-personal-tab">+ Pessoal</button>
+          <div class="tools-header-actions">
+            <button type="button" class="btn ghost" id="btn-manage-categories">Categorias</button>
+            <button type="button" class="btn primary" id="btn-add-personal-tab">+ Pessoal</button>
+          </div>
         </div>
         <div class="iave-filters" id="personal-cat-filters"></div>
         <div id="personal-list" class="cards-list"></div>
@@ -164,12 +167,7 @@
         </label>
       </div>
       <label class="personal-only-fields hidden">Categoria
-        <select name="category">
-          <option value="beleza">Beleza</option>
-          <option value="trabalho">Trabalho</option>
-          <option value="treinos">Treinos</option>
-          <option value="eventos">Eventos</option>
-        </select>
+        <select name="category"></select>
       </label>
       <div class="form-row">
         <label>Data
@@ -251,6 +249,37 @@
         <legend>Cor da nova matéria</legend>
         <div class="color-swatches" id="color-swatches"></div>
         <input type="hidden" name="color" value="#b45309" />
+      </fieldset>
+      <div class="modal-actions">
+        <span></span>
+        <div class="modal-actions-right">
+          <button type="submit" value="cancel" formnovalidate class="btn ghost">Fechar</button>
+          <button type="submit" value="save" class="btn primary">Adicionar</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="category-modal">
+    <form method="dialog" id="category-form">
+      <div class="modal-head">
+        <h3>Categorias pessoais</h3>
+        <button type="submit" value="cancel" formnovalidate class="icon-btn modal-close" aria-label="Fechar">×</button>
+      </div>
+      <p class="modal-hint">Cria categorias novas, altera nomes e escolhe cores. As tarefas já guardadas mantêm a categoria até a mudares.</p>
+      <div class="subject-list-wrap subject-list-top">
+        <h4>As tuas categorias</h4>
+        <div id="category-list" class="subject-list"></div>
+      </div>
+      <hr class="modal-sep" />
+      <h4 class="modal-subhead">Nova categoria</h4>
+      <label>Nome
+        <input type="text" name="label" maxlength="40" placeholder="ex: Saúde, Família…" />
+      </label>
+      <fieldset class="color-fieldset">
+        <legend>Cor da nova categoria</legend>
+        <div class="color-swatches" id="cat-color-swatches"></div>
+        <input type="hidden" name="color" value="#f2a0b8" />
       </fieldset>
       <div class="modal-actions">
         <span></span>

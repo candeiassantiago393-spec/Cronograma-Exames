@@ -421,7 +421,7 @@ window.CRONOGRAMA_DATA = {
     },
     {
       "week": 4,
-      "phase": "Mês 1 · Radiação, radicais e Gil Vicente",
+      "phase": "Mês 1 · Radiação, quantidade de matéria e Inês Pereira",
       "days": [
         [
           {
@@ -434,8 +434,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "PORT",
             "type": "estudo",
-            "title": "Auto da Barca do Inferno I",
-            "detail": "Fidalgo, Onzeneiro, Parvo e Sapateiro.",
+            "title": "Farsa de Inês Pereira I",
+            "detail": "AE 10.º — leitura integral: personagens iniciais, pedido de casamento e género da farsa.",
             "duration": "1h30–2h"
           }
         ],
@@ -448,10 +448,10 @@ window.CRONOGRAMA_DATA = {
             "duration": "1h30–2h"
           },
           {
-            "discipline": "PORT",
+            "discipline": "QUI",
             "type": "estudo",
-            "title": "Auto da Barca do Inferno II",
-            "detail": "Frade, Brízida Vaz, Judeu, Corregedor, Enforcado, Cavaleiros.",
+            "title": "Quantidade de matéria e mol",
+            "detail": "Unidade u, massa atómica relativa, constante de Avogadro, n=N/NA e n=m/M — só Química.",
             "duration": "1h30–2h"
           }
         ],
@@ -475,8 +475,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "PORT",
             "type": "estudo",
-            "title": "Farsa de Inês Pereira",
-            "detail": "Inês, Lianor Vaz, Pêro Marques e Brás da Mata.",
+            "title": "Farsa de Inês Pereira II",
+            "detail": "Casamentos, Pêro Marques, Brás da Mata e crítica ao casamento/convenções.",
             "duration": "1h30–2h"
           },
           {
@@ -498,8 +498,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "PORT",
             "type": "estudo",
-            "title": "Tipos de cómico em Gil Vicente",
-            "detail": "Caráter, situação, linguagem e crítica social.",
+            "title": "Cómico e crítica em Inês Pereira",
+            "detail": "Cómico de caráter, situação e linguagem — só a farsa das AE.",
             "duration": "1h30–2h"
           }
         ],
@@ -507,8 +507,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "FIS",
             "type": "resumo",
-            "title": "Resumo global Física 10.º",
-            "detail": "",
+            "title": "Resumo global Física 10.º (energia/radiação)",
+            "detail": "Sem misturar com Química.",
             "duration": "1h30–2h"
           },
           {
@@ -521,7 +521,7 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "PORT",
             "type": "ficha_iave",
-            "title": "Ficha de leitura — Gil Vicente",
+            "title": "Ficha de leitura — Farsa de Inês Pereira",
             "detail": "",
             "duration": "1h30–2h"
           }
@@ -608,8 +608,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "PORT",
             "type": "estudo",
-            "title": "2 Cantigas de Amor",
-            "detail": "D. Dinis / Bernardim Ribeiro.",
+            "title": "2 Cantigas de Amor — D. Dinis",
+            "detail": "Ambiente cortesão e coita — só trovadores (AE).",
             "duration": "1h30–2h"
           }
         ],
@@ -1273,14 +1273,14 @@ window.CRONOGRAMA_DATA = {
     },
     {
       "week": 12,
-      "phase": "Mês 3 · Eletromagnetismo e Os Maias",
+      "phase": "Mês 3 · Campo elétrico, indução e Os Maias",
       "days": [
         [
           {
             "discipline": "FIS",
             "type": "estudo",
-            "title": "Fluxo magnético e Faraday-Lenz",
-            "detail": "Φ=B·A·cosα; indução.",
+            "title": "Campo elétrico e energia elétrica",
+            "detail": "Só Física 10.º — carga, campo, potencial e fenómenos elétricos (base para indução).",
             "duration": "1h30–2h"
           },
           {
@@ -1311,8 +1311,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "FIS",
             "type": "estudo",
-            "title": "Efeito fotoelétrico",
-            "detail": "Fotões, Φ0 e Ek dos fotoeletrões (E=hf).",
+            "title": "Fluxo magnético e Faraday-Lenz",
+            "detail": "Φ=B·A·cosα; indução eletromagnética.",
             "duration": "1h30–2h"
           },
           {
@@ -1342,9 +1342,9 @@ window.CRONOGRAMA_DATA = {
         [
           {
             "discipline": "FIS",
-            "type": "ficha_iave",
-            "title": "6 exercícios — indução e fotoelétrico",
-            "detail": "",
+            "type": "estudo",
+            "title": "Efeito fotoelétrico",
+            "detail": "Fotões, Φ0 e Ek dos fotoeletrões (E=hf) — só Física.",
             "duration": "1h30–2h"
           },
           {
@@ -1358,9 +1358,9 @@ window.CRONOGRAMA_DATA = {
         [
           {
             "discipline": "FIS",
-            "type": "resumo",
-            "title": "Resumo módulo Física 11.º",
-            "detail": "",
+            "type": "ficha_iave",
+            "title": "6 exercícios — campo, indução e fotoelétrico",
+            "detail": "Sem misturar com Química.",
             "duration": "1h30–2h"
           },
           {
@@ -1383,14 +1383,14 @@ window.CRONOGRAMA_DATA = {
     },
     {
       "week": 13,
-      "phase": "Mês 4 · Química 10.º, sucessões e Maias",
+      "phase": "Mês 4 · Química 10.º (estrutura), sucessões e Maias",
       "days": [
         [
           {
             "discipline": "QUI",
             "type": "estudo",
             "title": "Elementos e tabela periódica",
-            "detail": "Massa atómica relativa; grupos, períodos, blocos.",
+            "detail": "Massa atómica relativa; grupos, períodos, blocos — só Química.",
             "duration": "1h30–2h"
           },
           {
@@ -1453,8 +1453,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "QUI",
             "type": "estudo",
-            "title": "Propriedades periódicas",
-            "detail": "Raios, energia de ionização, eletronegatividade.",
+            "title": "Gases e dispersões",
+            "detail": "Volume molar, lei de Avogadro; soluções/dispersões — só Química 10.º.",
             "duration": "1h30–2h"
           },
           {
@@ -1469,8 +1469,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "QUI",
             "type": "resumo",
-            "title": "Propriedades periódicas",
-            "detail": "",
+            "title": "Estrutura atómica + gases (Química 10.º)",
+            "detail": "Sem misturar com Física.",
             "duration": "1h30–2h"
           },
           {
@@ -1499,8 +1499,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "QUI",
             "type": "estudo",
-            "title": "Ligação química e VSEPR",
-            "detail": "Covalente, iónica, metálica; geometria molecular.",
+            "title": "Propriedades periódicas",
+            "detail": "Raios, energia de ionização, eletronegatividade — só Química.",
             "duration": "1h30–2h"
           },
           {
@@ -1531,8 +1531,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "QUI",
             "type": "estudo",
-            "title": "Polaridade e forças intermoleculares",
-            "detail": "London, dipolo-dipolo, H-bond.",
+            "title": "Ligação química e VSEPR",
+            "detail": "Covalente, iónica, metálica; geometria molecular.",
             "duration": "1h30–2h"
           },
           {
@@ -1563,8 +1563,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "QUI",
             "type": "estudo",
-            "title": "Química orgânica — intro",
-            "detail": "Hidrocarbonetos e grupos funcionais.",
+            "title": "Polaridade e forças intermoleculares",
+            "detail": "London, dipolo-dipolo, H-bond.",
             "duration": "1h30–2h"
           },
           {
@@ -1579,8 +1579,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "QUI",
             "type": "resumo",
-            "title": "Tabela geometria/polaridade",
-            "detail": "",
+            "title": "Tabela geometria/polaridade + propriedades",
+            "detail": "Sem misturar com Física.",
             "duration": "1h30–2h"
           },
           {
@@ -1609,8 +1609,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "QUI",
             "type": "estudo",
-            "title": "Soluções e concentrações",
-            "detail": "C=m/V, c=n/V e fração molar.",
+            "title": "Química orgânica — intro",
+            "detail": "Hidrocarbonetos e grupos funcionais — só Química.",
             "duration": "1h30–2h"
           },
           {
@@ -1641,8 +1641,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "QUI",
             "type": "estudo",
-            "title": "Diluição de soluções",
-            "detail": "ciVi=cfVf; ALs 1.1/1.2.",
+            "title": "Soluções e concentrações",
+            "detail": "C=m/V, c=n/V e fração molar.",
             "duration": "1h30–2h"
           },
           {
@@ -1672,9 +1672,9 @@ window.CRONOGRAMA_DATA = {
         [
           {
             "discipline": "QUI",
-            "type": "exercicios",
-            "title": "6 problemas — concentrações",
-            "detail": "Diluições e frações molares.",
+            "type": "estudo",
+            "title": "Diluição de soluções",
+            "detail": "ciVi=cfVf; ALs 1.1/1.2 — 6 problemas.",
             "duration": "1h30–2h"
           },
           {
@@ -1689,8 +1689,8 @@ window.CRONOGRAMA_DATA = {
           {
             "discipline": "QUI",
             "type": "resumo",
-            "title": "Fórmulas Química 10.º",
-            "detail": "",
+            "title": "Fórmulas Química 10.º (orgânica + soluções)",
+            "detail": "Sem misturar com Física.",
             "duration": "1h30–2h"
           },
           {
