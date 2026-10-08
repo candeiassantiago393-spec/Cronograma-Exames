@@ -31,8 +31,15 @@
     "#d4a574", // terracotta suave
   ];
 
+  const PERSONAL_CATEGORIES = {
+    beleza: { label: "Beleza", color: "#f2a0b8" },
+    trabalho: { label: "Trabalho", color: "#9aa8c4" },
+    treinos: { label: "Treinos", color: "#7dcb9e" },
+    eventos: { label: "Eventos", color: "#e8b060" },
+  };
+
   let state = loadState();
-  let viewMode = "month"; // month | week
+  let viewMode = window.matchMedia("(max-width: 900px)").matches ? "week" : "month";
   let viewYear = 2026;
   let viewMonth = 9;
   let weekAnchor = parseISO("2026-10-05");
@@ -40,16 +47,21 @@
   let editingTaskId = null;
   let activeTab = "calendar";
   let discFilter = new Set(allDisciplineIds());
+  let scopeFilter = "both"; // study | personal | both
+  let personalCatFilter = "ALL";
   let iaveSubjectFilter = "ALL";
   let errorDiscFilter = "ALL";
   let dragTaskId = null;
   let selectedSubjectColor = SUBJECT_COLORS[0];
+  let modalScopeDefault = "study";
 
   const els = {
     monthLabel: document.getElementById("month-label"),
     weekdayHead: document.getElementById("weekday-head"),
     grid: document.getElementById("calendar-grid"),
     legend: document.getElementById("legend"),
+    legendRow: document.getElementById("legend-row"),
+    scopeFilters: document.getElementById("scope-filters"),
     sideEmpty: document.getElementById("side-empty"),
     sideContent: document.getElementById("side-content"),
     sideWeek: document.getElementById("side-week"),
@@ -78,6 +90,8 @@
     iaveForm: document.getElementById("iave-form"),
     iaveModalTitle: document.getElementById("iave-modal-title"),
     btnDeleteIave: document.getElementById("btn-delete-iave"),
+    personalList: document.getElementById("personal-list"),
+    personalCatFilters: document.getElementById("personal-cat-filters"),
   };
 
   let editingIaveId = null;
@@ -259,8 +273,60 @@
     if (selectedDate) openDay(selectedDate);
   }
 
+  function isPersonal(task) {
+    return task?.scope === "personal";
+  }
+
+  function personalCategoryLabel(cat) {
+    return PERSONAL_CATEGORIES[cat]?.label || cat || "Pessoal";
+  }
+
+  function personalCategoryColor(cat) {
+    return PERSONAL_CATEGORIES[cat]?.color || "#c9a0dc";
+  }
+
+  function taskChipColor(task) {
+    if (isPersonal(task)) return personalCategoryColor(task.category);
+    return disciplineColor(task.discipline);
+  }
+
+  function shortLabel(task) {
+    if (isPersonal(task)) {
+      return `${personalCategoryLabel(task.category)}: ${task.title}`;
+    }
+    const prefix = BUILTIN_IDS.includes(task.discipline)
+      ? task.discipline
+      : disciplineLabel(task.discipline);
+    return `${prefix}: ${task.title}`;
+  }
+
   function tasksFor(iso) {
-    return (state.tasksByDate[iso] || []).filter((t) => discFilter.has(t.discipline));
+    return (state.tasksByDate[iso] || []).filter((t) => {
+      const personal = isPersonal(t);
+      if (scopeFilter === "study" && personal) return false;
+      if (scopeFilter === "personal" && !personal) return false;
+      if (personal) {
+        if (personalCatFilter !== "ALL" && (t.category || "eventos") !== personalCatFilter) {
+          return false;
+        }
+        return true;
+      }
+      return discFilter.has(t.discipline);
+    });
+  }
+
+  function passFilter(task) {
+    return taskMatchesFilters(task);
+  }
+
+  function taskMatchesFilters(task) {
+    const personal = isPersonal(task);
+    if (scopeFilter === "study" && personal) return false;
+    if (scopeFilter === "personal" && !personal) return false;
+    if (personal) {
+      return personalCatFilter === "ALL" || (task.category || "eventos") === personalCatFilter;
+    }
+    return discFilter.has(task.discipline);
   }
 
   function allTasksFor(iso) {
@@ -288,13 +354,6 @@
 
   function escapeAttr(str) {
     return escapeHtml(str).replaceAll("'", "&#39;");
-  }
-
-  function shortLabel(task) {
-    const prefix = BUILTIN_IDS.includes(task.discipline)
-      ? task.discipline
-      : disciplineLabel(task.discipline);
-    return `${prefix}: ${task.title}`;
   }
 
   function findDateOfTask(id) {
@@ -362,13 +421,57 @@
   }
 
   function passFilter(task) {
-    return discFilter.has(task.discipline);
+    return taskMatchesFilters(task);
   }
 
   /* ——— Legend / filters ——— */
+  function updateScopeUi() {
+    const personalOnly = scopeFilter === "personal";
+    document.querySelectorAll(".study-tab").forEach((el) => {
+      el.classList.toggle("hidden", personalOnly);
+    });
+    if (els.legendRow) {
+      els.legendRow.classList.toggle("hidden", personalOnly || activeTab !== "calendar");
+    }
+    document.getElementById("btn-manage-subjects")?.classList.toggle(
+      "hidden",
+      personalOnly || activeTab !== "calendar",
+    );
+    if (personalOnly && ["errors", "sims", "iave"].includes(activeTab)) {
+      switchTab("calendar");
+    }
+  }
+
+  function renderScopeFilters() {
+    if (!els.scopeFilters) return;
+    els.scopeFilters.innerHTML = "";
+    const options = [
+      { id: "study", label: "Estudos" },
+      { id: "personal", label: "Pessoal" },
+      { id: "both", label: "Ambos" },
+    ];
+    for (const opt of options) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `legend-chip filter-chip scope-chip${scopeFilter === opt.id ? " active" : ""}`;
+      btn.textContent = opt.label;
+      btn.addEventListener("click", () => {
+        scopeFilter = opt.id;
+        updateScopeUi();
+        renderAll();
+        if (selectedDate) openDay(selectedDate);
+      });
+      els.scopeFilters.appendChild(btn);
+    }
+  }
+
   function renderLegend() {
+    renderScopeFilters();
+    updateScopeUi();
     const ids = allDisciplineIds();
     els.legend.innerHTML = "";
+    if (scopeFilter === "personal") return;
+
     const allBtn = document.createElement("button");
     allBtn.type = "button";
     allBtn.className = `legend-chip filter-chip${discFilter.size === ids.length ? " active" : ""}`;
@@ -442,9 +545,8 @@
   function makeChipEl(task) {
     const done = !!state.done[task.id];
     const el = document.createElement("div");
-    el.className = `chip ${discClass(task.discipline)}${done ? " done" : ""}`;
-    const style = discInlineStyle(task.discipline);
-    if (style) el.setAttribute("style", style);
+    el.className = `chip ${isPersonal(task) ? "chip-custom" : discClass(task.discipline)}${done ? " done" : ""}`;
+    el.style.background = taskChipColor(task);
     el.draggable = true;
     el.title = `${task.title}${task.difficulty ? ` · ${DIFFICULTY_LABELS[task.difficulty]}` : ""} (arrasta para outro dia)`;
     el.textContent = shortLabel(task);
@@ -633,15 +735,20 @@
         <div>
           <h4>${escapeHtml(task.title)}</h4>
           <div class="task-meta">
-            <span class="tag ${discClass(task.discipline)}" style="color:#1c1917;${discInlineStyle(task.discipline)}">${escapeHtml(disciplineLabel(task.discipline))}</span>
-            <span class="tag type">${escapeHtml(DATA.typeLabels[task.type] || task.type)}</span>
-            ${task.difficulty ? `<span class="tag diff-${task.difficulty}">${escapeHtml(DIFFICULTY_LABELS[task.difficulty] || task.difficulty)}</span>` : ""}
+            ${
+              isPersonal(task)
+                ? `<span class="tag chip-custom" style="color:#1c1917;background:${personalCategoryColor(task.category)}">${escapeHtml(personalCategoryLabel(task.category))}</span>
+                   <span class="tag type">Pessoal</span>`
+                : `<span class="tag ${discClass(task.discipline)}" style="color:#1c1917;${discInlineStyle(task.discipline)}">${escapeHtml(disciplineLabel(task.discipline))}</span>
+                   <span class="tag type">${escapeHtml(DATA.typeLabels[task.type] || task.type)}</span>
+                   ${task.difficulty ? `<span class="tag diff-${task.difficulty}">${escapeHtml(DIFFICULTY_LABELS[task.difficulty] || task.difficulty)}</span>` : ""}`
+            }
             ${task.duration ? `<span class="duration">${escapeHtml(task.duration)}</span>` : ""}
           </div>
           ${task.detail ? `<p>${escapeHtml(task.detail)}</p>` : ""}
           <div class="task-actions">
             <button type="button" class="btn ghost small" data-edit>Editar</button>
-            <button type="button" class="btn ghost small" data-error>Registar erro</button>
+            ${isPersonal(task) ? "" : `<button type="button" class="btn ghost small" data-error>Registar erro</button>`}
           </div>
         </div>
       </div>
@@ -653,7 +760,8 @@
       openDay(selectedDate);
     });
     li.querySelector("[data-edit]").addEventListener("click", () => openModal(task));
-    li.querySelector("[data-error]").addEventListener("click", () => openErrorModal(task));
+    const errBtn = li.querySelector("[data-error]");
+    if (errBtn) errBtn.addEventListener("click", () => openErrorModal(task));
     li.querySelector("[data-up]").addEventListener("click", (e) => {
       e.stopPropagation();
       if (reorderTask(task.id, -1)) {
@@ -687,18 +795,39 @@
     ).join("");
   }
 
-  function openModal(task) {
+  function setModalScopeFields(scope) {
+    const personal = scope === "personal";
+    document.querySelectorAll(".study-only-fields").forEach((el) => {
+      el.classList.toggle("hidden", personal);
+    });
+    document.querySelectorAll(".personal-only-fields").forEach((el) => {
+      el.classList.toggle("hidden", !personal);
+    });
+    els.form.elements.scope.value = scope;
+  }
+
+  function openModal(task, forceScope) {
     editingTaskId = task ? task.id : null;
-    els.modalTitle.textContent = task ? "Editar tarefa" : "Nova tarefa";
+    const scope = task ? (isPersonal(task) ? "personal" : "study") : forceScope || modalScopeDefault;
+    els.modalTitle.textContent = task
+      ? scope === "personal"
+        ? "Editar pessoal"
+        : "Editar tarefa"
+      : scope === "personal"
+        ? "Nova tarefa pessoal"
+        : "Nova tarefa de estudo";
     els.btnDelete.classList.toggle("hidden", !task);
+    setModalScopeFields(scope);
     els.form.elements.title.value = task?.title || "";
     els.form.elements.detail.value = task?.detail || "";
     els.form.elements.discipline.value = task?.discipline || "FIS";
     els.form.elements.type.value = task?.type || "estudo";
+    els.form.elements.category.value = task?.category || "eventos";
     els.form.elements.date.value = task
       ? findDateOfTask(task.id) || selectedDate
       : selectedDate || toISO(new Date(viewYear, viewMonth, 1));
-    els.form.elements.duration.value = task?.duration || "1h30–2h";
+    els.form.elements.duration.value =
+      task?.duration || (scope === "personal" ? "1h" : "1h30–2h");
     els.form.elements.difficulty.value = task?.difficulty || "";
     els.modal.showModal();
   }
@@ -707,20 +836,34 @@
     const title = els.form.elements.title.value.trim();
     if (!title) return;
     const date = els.form.elements.date.value;
-    const payload = {
-      id: editingTaskId || uid("custom"),
-      title,
-      detail: els.form.elements.detail.value.trim(),
-      discipline: els.form.elements.discipline.value,
-      type: els.form.elements.type.value,
-      duration: els.form.elements.duration.value.trim() || "—",
-      difficulty: els.form.elements.difficulty.value || "",
-    };
+    const scope = els.form.elements.scope.value === "personal" ? "personal" : "study";
+    const payload =
+      scope === "personal"
+        ? {
+            id: editingTaskId || uid("pers"),
+            scope: "personal",
+            title,
+            detail: els.form.elements.detail.value.trim(),
+            category: els.form.elements.category.value || "eventos",
+            duration: els.form.elements.duration.value.trim() || "—",
+            discipline: "PES",
+            type: "pessoal",
+          }
+        : {
+            id: editingTaskId || uid("custom"),
+            scope: "study",
+            title,
+            detail: els.form.elements.detail.value.trim(),
+            discipline: els.form.elements.discipline.value,
+            type: els.form.elements.type.value,
+            duration: els.form.elements.duration.value.trim() || "—",
+            difficulty: els.form.elements.difficulty.value || "",
+          };
     if (editingTaskId) {
       const oldDate = findDateOfTask(editingTaskId);
       if (oldDate) {
         const existing = allTasksFor(oldDate).find((t) => t.id === editingTaskId);
-        if (existing) {
+        if (existing && scope === "study") {
           payload.week = existing.week;
           payload.phase = existing.phase;
         }
@@ -731,6 +874,7 @@
     state.tasksByDate[date].push(payload);
     saveState();
     openDay(date);
+    if (activeTab === "personal") renderPersonalPanel();
   }
 
   /* ——— Caderno de Erros ——— */
@@ -1306,18 +1450,90 @@
     reader.readAsText(file);
   }
 
+  function renderPersonalPanel() {
+    if (!els.personalList) return;
+    if (els.personalCatFilters) {
+      els.personalCatFilters.innerHTML = "";
+      for (const key of ["ALL", ...Object.keys(PERSONAL_CATEGORIES)]) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `btn small${personalCatFilter === key ? " primary" : " ghost"}`;
+        btn.textContent = key === "ALL" ? "Todas" : PERSONAL_CATEGORIES[key].label;
+        btn.addEventListener("click", () => {
+          personalCatFilter = key;
+          renderPersonalPanel();
+          renderCalendar();
+          if (selectedDate) openDay(selectedDate);
+        });
+        els.personalCatFilters.appendChild(btn);
+      }
+    }
+
+    const items = [];
+    for (const [iso, list] of Object.entries(state.tasksByDate)) {
+      for (const task of list) {
+        if (!isPersonal(task)) continue;
+        if (personalCatFilter !== "ALL" && (task.category || "eventos") !== personalCatFilter) continue;
+        items.push({ iso, task });
+      }
+    }
+    items.sort((a, b) => a.iso.localeCompare(b.iso));
+
+    els.personalList.innerHTML = "";
+    if (!items.length) {
+      els.personalList.innerHTML = `<div class="empty-hint">Ainda sem tarefas pessoais. Usa “+ Pessoal” no calendário ou aqui.</div>`;
+      return;
+    }
+    for (const { iso, task } of items) {
+      const done = !!state.done[task.id];
+      const card = document.createElement("article");
+      card.className = `tool-card${done ? " done-exam" : ""}`;
+      card.innerHTML = `
+        <div class="tool-card-top">
+          <span class="tag chip-custom" style="color:#1c1917;background:${personalCategoryColor(task.category)}">${escapeHtml(personalCategoryLabel(task.category))}</span>
+          <span class="duration">${escapeHtml(iso)}</span>
+        </div>
+        <h3>${escapeHtml(task.title)}</h3>
+        ${task.detail ? `<p>${escapeHtml(task.detail)}</p>` : ""}
+        <div class="task-actions">
+          <button type="button" class="btn ghost small" data-goto>Ir ao dia</button>
+          <button type="button" class="btn ghost small" data-edit>Editar</button>
+        </div>
+      `;
+      card.querySelector("[data-goto]").addEventListener("click", () => {
+        switchTab("calendar");
+        const d = parseISO(iso);
+        viewYear = d.getFullYear();
+        viewMonth = d.getMonth();
+        weekAnchor = d;
+        openDay(iso);
+      });
+      card.querySelector("[data-edit]").addEventListener("click", () => openModal(task, "personal"));
+      els.personalList.appendChild(card);
+    }
+  }
+
   function switchTab(tab) {
     activeTab = tab;
     document.querySelectorAll(".tab").forEach((b) => {
       b.classList.toggle("active", b.dataset.tab === tab);
     });
     document.getElementById("panel-calendar").classList.toggle("hidden", tab !== "calendar");
+    document.getElementById("panel-personal")?.classList.toggle("hidden", tab !== "personal");
     document.getElementById("panel-errors").classList.toggle("hidden", tab !== "errors");
     document.getElementById("panel-sims").classList.toggle("hidden", tab !== "sims");
     document.getElementById("panel-iave").classList.toggle("hidden", tab !== "iave");
-    els.legend.classList.toggle("hidden", tab !== "calendar");
-    document.querySelector(".legend-row")?.classList.toggle("hidden", tab !== "calendar");
-    document.getElementById("btn-manage-subjects")?.classList.toggle("hidden", tab !== "calendar");
+    const onCal = tab === "calendar";
+    els.scopeFilters?.classList.toggle("hidden", !onCal && tab !== "personal");
+    updateScopeUi();
+    if (tab === "calendar") {
+      els.legend.classList.toggle("hidden", scopeFilter === "personal");
+      els.legendRow?.classList.toggle("hidden", scopeFilter === "personal");
+    } else {
+      els.legend.classList.add("hidden");
+      els.legendRow?.classList.add("hidden");
+    }
+    if (tab === "personal") renderPersonalPanel();
     if (tab === "errors") renderErrors();
     if (tab === "sims") renderSims();
     if (tab === "iave") renderIave();
@@ -1354,6 +1570,7 @@
   function renderAll() {
     renderLegend();
     renderCalendar();
+    if (activeTab === "personal") renderPersonalPanel();
     if (activeTab === "errors") renderErrors();
     if (activeTab === "sims") renderSims();
     if (activeTab === "iave") renderIave();
@@ -1420,7 +1637,18 @@
       els.sideEmpty.classList.remove("hidden");
       renderCalendar();
     });
-    document.getElementById("btn-add-task").addEventListener("click", () => openModal(null));
+    document.getElementById("btn-add-task").addEventListener("click", () => {
+      modalScopeDefault = "study";
+      openModal(null, "study");
+    });
+    document.getElementById("btn-add-personal")?.addEventListener("click", () => {
+      modalScopeDefault = "personal";
+      openModal(null, "personal");
+    });
+    document.getElementById("btn-add-personal-tab")?.addEventListener("click", () => {
+      modalScopeDefault = "personal";
+      openModal(null, "personal");
+    });
     document.getElementById("btn-add-error").addEventListener("click", () => openErrorModal(null));
     document.getElementById("btn-manage-subjects").addEventListener("click", openSubjectModal);
     document.getElementById("btn-add-iave").addEventListener("click", () => openIaveModal(null));
@@ -1461,6 +1689,9 @@
 
   // init
   fillSelects();
+  document.querySelectorAll(".view-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.view === viewMode);
+  });
   bind();
   renderAll();
 })();

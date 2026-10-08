@@ -39,12 +39,15 @@
 
     <nav class="tabs" id="main-tabs" aria-label="Secções">
       <button type="button" class="tab active" data-tab="calendar">Calendário</button>
-      <button type="button" class="tab" data-tab="errors">Caderno de Erros</button>
-      <button type="button" class="tab" data-tab="sims">Simulacros</button>
-      <button type="button" class="tab" data-tab="iave">Exames IAVE</button>
+      <button type="button" class="tab" data-tab="personal">Pessoal</button>
+      <button type="button" class="tab study-tab" data-tab="errors">Caderno de Erros</button>
+      <button type="button" class="tab study-tab" data-tab="sims">Simulacros</button>
+      <button type="button" class="tab study-tab" data-tab="iave">Exames IAVE</button>
     </nav>
 
-    <div class="legend-row">
+    <div class="scope-row" id="scope-filters" role="group" aria-label="Tipo de tarefas"></div>
+
+    <div class="legend-row" id="legend-row">
       <div class="legend" id="legend"></div>
       <button type="button" class="btn ghost small" id="btn-manage-subjects">Editar matérias</button>
     </div>
@@ -59,7 +62,7 @@
         <aside class="side-panel" id="side-panel" aria-live="polite">
           <div class="side-empty" id="side-empty">
             <h3>Seleciona um dia</h3>
-            <p>Clica num dia, arrasta chips entre dias, ou filtra disciplinas na legenda.</p>
+            <p>Clica num dia, arrasta chips entre dias, ou filtra Estudos / Pessoal acima.</p>
           </div>
           <div class="side-content hidden" id="side-content">
             <div class="side-header">
@@ -70,13 +73,28 @@
               <button type="button" class="icon-btn" id="btn-close-panel" aria-label="Fechar">×</button>
             </div>
             <div class="side-toolbar">
-              <button type="button" class="btn ghost small" id="btn-add-task">+ Tarefa</button>
+              <button type="button" class="btn ghost small" id="btn-add-task">+ Estudo</button>
+              <button type="button" class="btn ghost small" id="btn-add-personal">+ Pessoal</button>
               <span class="side-progress" id="side-progress"></span>
             </div>
             <ul class="task-list" id="task-list"></ul>
           </div>
         </aside>
       </main>
+    </section>
+
+    <section class="tab-panel hidden" id="panel-personal">
+      <div class="tools-card">
+        <div class="tools-header">
+          <div>
+            <h2>Tarefas pessoais</h2>
+            <p>Beleza, trabalho, treinos, eventos — no mesmo calendário, com filtro próprio.</p>
+          </div>
+          <button type="button" class="btn primary" id="btn-add-personal-tab">+ Pessoal</button>
+        </div>
+        <div class="iave-filters" id="personal-cat-filters"></div>
+        <div id="personal-list" class="cards-list"></div>
+      </div>
     </section>
 
     <section class="tab-panel hidden" id="panel-errors">
@@ -130,13 +148,14 @@
         <h3 id="modal-title">Editar tarefa</h3>
         <button type="submit" value="cancel" formnovalidate class="icon-btn modal-close" aria-label="Fechar">×</button>
       </div>
+      <input type="hidden" name="scope" value="study" />
       <label>Título
         <input type="text" name="title" required maxlength="200" />
       </label>
-      <label>Detalhe
-        <textarea name="detail" rows="4" maxlength="2000"></textarea>
+      <label>Detalhe / nota
+        <textarea name="detail" rows="3" maxlength="2000"></textarea>
       </label>
-      <div class="form-row">
+      <div class="form-row study-only-fields">
         <label>Disciplina
           <select name="discipline"></select>
         </label>
@@ -144,6 +163,14 @@
           <select name="type"></select>
         </label>
       </div>
+      <label class="personal-only-fields hidden">Categoria
+        <select name="category">
+          <option value="beleza">Beleza</option>
+          <option value="trabalho">Trabalho</option>
+          <option value="treinos">Treinos</option>
+          <option value="eventos">Eventos</option>
+        </select>
+      </label>
       <div class="form-row">
         <label>Data
           <input type="date" name="date" required />
@@ -152,7 +179,7 @@
           <input type="text" name="duration" placeholder="ex: 1h30–2h" maxlength="40" />
         </label>
       </div>
-      <label>Dificuldade
+      <label class="study-only-fields">Dificuldade
         <select name="difficulty">
           <option value="">Sem classificação</option>
           <option value="facil">Fácil</option>
