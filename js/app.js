@@ -236,22 +236,6 @@
     return next;
   }
 
-  function scoreSavedPlan(parsed) {
-    if (!parsed?.tasksByDate) return -1;
-    let userTasks = 0;
-    let total = 0;
-    for (const list of Object.values(parsed.tasksByDate)) {
-      for (const t of list || []) {
-        total += 1;
-        if (isUserTask(t)) userTasks += 1;
-      }
-    }
-    const customs = (parsed.customSubjects || []).length;
-    const colors = Object.keys(parsed.subjectColors || {}).length;
-    const doneN = Object.keys(parsed.done || {}).length;
-    return userTasks * 100 + customs * 50 + colors * 10 + doneN * 2 + total;
-  }
-
   function readStoredPlan(key) {
     try {
       const raw = localStorage.getItem(key);
@@ -260,20 +244,6 @@
     } catch {
       return null;
     }
-  }
-
-  /** Escolhe a cópia mais “rica” (customs / feitos / tarefas tuas). */
-  function pickRichestPlan(...candidates) {
-    let best = null;
-    let bestScore = -1;
-    for (const c of candidates) {
-      const s = scoreSavedPlan(c);
-      if (s > bestScore) {
-        best = c;
-        bestScore = s;
-      }
-    }
-    return best;
   }
 
   function pruneDoneToExisting(tasksByDate, done) {
@@ -359,29 +329,23 @@
 
   function loadState() {
     try {
+      // Sempre o estado actual. PREV / v1 NUNCA entram sozinhos no load
+      // (isso fazia reaparecer tarefas já apagadas). PREV só via «Desfazer save».
       const current = readStoredPlan(STORAGE_KEY);
-      const prev = readStoredPlan(STORAGE_PREV_KEY);
-      const legacy = readStoredPlan("cronograma-exames-v1");
-
-      if (!current && !prev && !legacy) {
-        return {
-          tasksByDate: buildDefaultTasks(),
-          done: {},
-          planVersion: CURRENT_PLAN_VERSION,
-          recoveredFromV1: true,
-          ...emptyStateExtras(),
-        };
+      if (current?.tasksByDate && Object.keys(current.tasksByDate).length) {
+        return hydrateFromParsed(current);
       }
-
-      // NUNCA substitui o calendário pelo plano oficial no load.
-      // Se um refresh/update antigo estragou dados, recupera a cópia mais rica.
-      const richest = pickRichestPlan(current, prev, legacy);
-      const notice =
-        richest && current && richest !== current && scoreSavedPlan(richest) > scoreSavedPlan(current) + 20
-          ? "recovered"
-          : null;
-
-      return hydrateFromParsed(richest || current || prev || legacy, notice);
+      const legacy = readStoredPlan("cronograma-exames-v1");
+      if (legacy?.tasksByDate && Object.keys(legacy.tasksByDate).length) {
+        return hydrateFromParsed(legacy);
+      }
+      return {
+        tasksByDate: buildDefaultTasks(),
+        done: {},
+        planVersion: CURRENT_PLAN_VERSION,
+        recoveredFromV1: true,
+        ...emptyStateExtras(),
+      };
     } catch {
       return {
         tasksByDate: buildDefaultTasks(),
@@ -410,6 +374,20 @@
     });
   }
 
+  let saveStatusTimer = null;
+
+  function flashSaved() {
+    const el = document.getElementById("save-status");
+    if (!el) return;
+    el.textContent = "Guardado ✓";
+    el.classList.add("flash");
+    clearTimeout(saveStatusTimer);
+    saveStatusTimer = setTimeout(() => {
+      el.textContent = "Guarda sozinho neste browser";
+      el.classList.remove("flash");
+    }, 1600);
+  }
+
   function saveState() {
     try {
       const existing = localStorage.getItem(STORAGE_KEY);
@@ -423,7 +401,18 @@
     } catch {
       /* ignore quota */
     }
-    localStorage.setItem(STORAGE_KEY, serializeState());
+    try {
+      localStorage.setItem(STORAGE_KEY, serializeState());
+      flashSaved();
+    } catch (err) {
+      console.error(err);
+      const el = document.getElementById("save-status");
+      if (el) {
+        el.textContent = "Erro ao guardar — espaço do browser cheio?";
+        el.classList.remove("flash");
+      }
+      alert("Não foi possível guardar. O browser pode ter o armazenamento bloqueado ou cheio.");
+    }
   }
 
   function resetToPlan() {
@@ -1631,7 +1620,7 @@
     try {
       await navigator.clipboard.writeText(text);
       alert(
-        `Backup copiado (${total} tarefas, ${customs} matérias extra, ${doneN} concluídas).\n\nNo GitHub: clica «Colar backup» e cola (Ctrl+V).`,
+        `Backup do estado actual copiado (${total} tarefas, ${customs} matérias extra, ${doneN} concluídas).\n\nSó precisas disto para mudar de telemóvel/PC — no dia-a-dia não é preciso.`,
       );
       return true;
     } catch {
@@ -1661,16 +1650,7 @@
     link.click();
     URL.revokeObjectURL(link.href);
     alert(
-      `Backup guardado (${total} tarefas, ${customs} matérias extra, ${doneN} concluídas).\n\nNo GitHub: Restaurar (ficheiro) ou «Colar backup».`,
-    );
-  }
-
-  function hasLocalCustomizations() {
-    return (
-      countUserTasks() > 0 ||
-      (state.customSubjects || []).length > 0 ||
-      Object.keys(state.subjectColors || {}).length > 0 ||
-      Object.keys(state.done || {}).length > 0
+      `Backup do estado actual guardado (${total} tarefas, ${customs} matérias extra, ${doneN} concluídas).\n\nSó para migrar entre dispositivos — no dia-a-dia as tarefas já gravam sozinhas.`,
     );
   }
 
@@ -1678,44 +1658,22 @@
     const box = els.storageBanner;
     if (!box) return;
     const dismissed = localStorage.getItem("cronograma-storage-tip") === "1";
-    const isFile = location.protocol === "file:";
-    const isOnline = location.protocol === "http:" || location.protocol === "https:";
-    const customized = hasLocalCustomizations();
 
-    let html = "";
-    if (isFile && customized) {
-      html = `
-        <p><strong>Estás no ficheiro local.</strong> Antes de refresh ou fechar: <strong>Backup</strong> (copia os dados).
-        Depois no GitHub usa <strong>Colar backup</strong>. O calendário já não se altera sozinho ao recarregar.</p>
-        <div class="banner-actions">
-          <button type="button" class="btn primary small" data-banner-backup>Copiar backup</button>
-          <button type="button" class="btn ghost small" data-banner-undo>Desfazer save</button>
-          <button type="button" class="btn ghost small" data-banner-dismiss>Entendi</button>
-        </div>`;
-    } else if (isOnline && !customized && !dismissed) {
-      html = `
-        <p><strong>Ainda sem as tuas tarefas neste link.</strong> Na aba do ficheiro local clica <strong>Backup</strong>
-        (copia os dados) e aqui clica <strong>Colar backup</strong>. O download de ficheiro no file:// costuma falhar.</p>
-        <div class="banner-actions">
-          <button type="button" class="btn primary small" data-banner-paste>Colar backup</button>
-          <button type="button" class="btn ghost small" data-banner-restore>Restaurar ficheiro</button>
-          <button type="button" class="btn ghost small" data-banner-dismiss>Já está</button>
-        </div>`;
-    }
-
-    if (!html) {
+    // Só avisa no file:// — no GitHub tudo grava sozinho, sem insistir em Backup.
+    if (location.protocol !== "file:" || dismissed) {
       box.classList.add("hidden");
       box.innerHTML = "";
       return;
     }
+
     box.classList.remove("hidden");
-    box.innerHTML = html;
-    box.querySelector("[data-banner-backup]")?.addEventListener("click", () => copyBackupToClipboard());
-    box.querySelector("[data-banner-paste]")?.addEventListener("click", openPasteRestore);
-    box.querySelector("[data-banner-undo]")?.addEventListener("click", restorePreviousSave);
-    box.querySelector("[data-banner-restore]")?.addEventListener("click", () => {
-      document.getElementById("restore-file")?.click();
-    });
+    box.innerHTML = `
+      <p><strong>Não uses este ficheiro local.</strong> Abre
+      <a href="https://candeiassantiago393-spec.github.io/Cronograma-Exames/" target="_blank" rel="noopener">o link do GitHub</a>
+      e trabalha só lá — as tarefas gravam sozinhas. Backup (menu Dados) só se mudares de telemóvel/PC.</p>
+      <div class="banner-actions">
+        <button type="button" class="btn ghost small" data-banner-dismiss>Entendi</button>
+      </div>`;
     box.querySelector("[data-banner-dismiss]")?.addEventListener("click", () => {
       localStorage.setItem("cronograma-storage-tip", "1");
       box.classList.add("hidden");
@@ -2219,18 +2177,8 @@
     });
   }
 
-  // init — NÃO grava no load (isso já destruiu dados no passado).
-  if (state.notice === "recovered") {
-    delete state.notice;
-    saveState();
-    setTimeout(() => {
-      alert(
-        "Recuperei uma cópia anterior do teu calendário neste browser (tarefas/cores/feitos). Confirma se está correcto e faz Backup.",
-      );
-    }, 300);
-  } else {
-    delete state.notice;
-  }
+  // init — não grava no load; não recupera PREV automaticamente.
+  delete state.notice;
   fillSelects();
   document.querySelectorAll(".view-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.view === viewMode);
