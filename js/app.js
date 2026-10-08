@@ -204,16 +204,65 @@
     return map;
   }
 
-  /** Novo plano de estudo + mantém só tarefas pessoais do plano antigo. */
-  function mergePlanKeepingPersonal(oldMap) {
+  function isGeneratedTask(task) {
+    const id = task?.id || "";
+    return /^w\d+_d\d+_\d+$/.test(id) || /^prep_/.test(id);
+  }
+
+  /** Tarefas que o utilizador criou/editou (pessoais + estudo custom). */
+  function isUserTask(task) {
+    if (!task) return false;
+    if (isPersonal(task)) return true;
+    if (!isGeneratedTask(task)) return true;
+    return false;
+  }
+
+  /** Plano oficial novo + mantém todas as tarefas que tu adicionaste. */
+  function mergePlanKeepingUserTasks(oldMap) {
     const next = buildDefaultTasks();
     for (const [iso, list] of Object.entries(oldMap || {})) {
-      const personal = (list || []).filter((t) => isPersonal(t));
-      if (!personal.length) continue;
+      const keep = (list || []).filter(isUserTask);
+      if (!keep.length) continue;
       if (!next[iso]) next[iso] = [];
-      next[iso].push(...personal);
+      const seen = new Set(next[iso].map((t) => t.id));
+      for (const t of keep) {
+        if (seen.has(t.id)) continue;
+        next[iso].push(t);
+        seen.add(t.id);
+      }
     }
     return next;
+  }
+
+  /** Injeta tarefas de utilizador de um mapa antigo noutro (sem duplicar ids). */
+  function injectUserTasks(targetMap, sourceMap) {
+    let added = 0;
+    const existingIds = new Set();
+    for (const list of Object.values(targetMap || {})) {
+      for (const t of list || []) existingIds.add(t.id);
+    }
+    for (const [iso, list] of Object.entries(sourceMap || {})) {
+      for (const t of list || []) {
+        if (!isUserTask(t) || existingIds.has(t.id)) continue;
+        if (!targetMap[iso]) targetMap[iso] = [];
+        targetMap[iso].push(t);
+        existingIds.add(t.id);
+        added += 1;
+      }
+    }
+    return added;
+  }
+
+  function tryRecoverUserTasksFromLegacy(tasksByDate) {
+    try {
+      const raw = localStorage.getItem("cronograma-exames-v1");
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.tasksByDate) return 0;
+      return injectUserTasks(tasksByDate, parsed.tasksByDate);
+    } catch {
+      return 0;
+    }
   }
 
   function pruneDoneToExisting(tasksByDate, done) {
@@ -293,20 +342,36 @@
           : buildDefaultTasks();
       let done = parsed.done || {};
       let planVersion = parsed.planVersion || 0;
-      let planUpdated = false;
+      let notice = null;
 
+      // Atualiza só o plano oficial; nunca apaga tarefas que tu criaste.
       if (planVersion < CURRENT_PLAN_VERSION) {
-        tasksByDate = mergePlanKeepingPersonal(tasksByDate);
+        tasksByDate = mergePlanKeepingUserTasks(tasksByDate);
         done = pruneDoneToExisting(tasksByDate, done);
         planVersion = CURRENT_PLAN_VERSION;
-        planUpdated = true;
+        notice = "updated";
+      }
+
+      // Recuperação one-shot: update v3 podia ter apagado customs — tenta backup v1.
+      let recoveredFromV1 = !!parsed.recoveredFromV1;
+      if (!recoveredFromV1) {
+        const recovered = tryRecoverUserTasksFromLegacy(tasksByDate);
+        recoveredFromV1 = true;
+        if (recovered > 0) {
+          done = pruneDoneToExisting(tasksByDate, {
+            ...done,
+            ...(parsed.done || {}),
+          });
+          notice = "recovered";
+        }
       }
 
       return {
         tasksByDate,
         done,
         planVersion,
-        planUpdated,
+        recoveredFromV1,
+        notice,
         errors: parsed.errors || [],
         simScores: parsed.simScores || {},
         iaveDone: parsed.iaveDone || {},
@@ -333,6 +398,7 @@
         tasksByDate: state.tasksByDate,
         done: state.done,
         planVersion: state.planVersion || CURRENT_PLAN_VERSION,
+        recoveredFromV1: !!state.recoveredFromV1,
         errors: state.errors,
         simScores: state.simScores,
         iaveDone: state.iaveDone,
@@ -346,8 +412,14 @@
   }
 
   function resetToPlan() {
-    if (!confirm("Repor o plano original? Mantém Caderno de Erros, notas, IAVE e tarefas pessoais.")) return;
-    state.tasksByDate = mergePlanKeepingPersonal(state.tasksByDate);
+    if (
+      !confirm(
+        "Repor o plano oficial de estudo? Mantém as tarefas que tu adicionaste (pessoais e estudo), Caderno de Erros, notas e IAVE.",
+      )
+    ) {
+      return;
+    }
+    state.tasksByDate = mergePlanKeepingUserTasks(state.tasksByDate);
     state.done = pruneDoneToExisting(state.tasksByDate, state.done);
     state.planVersion = CURRENT_PLAN_VERSION;
     saveState();
@@ -1539,7 +1611,7 @@
         let done = data.done || {};
         let planVersion = data.planVersion || 0;
         if (planVersion < CURRENT_PLAN_VERSION) {
-          tasksByDate = mergePlanKeepingPersonal(tasksByDate);
+          tasksByDate = mergePlanKeepingUserTasks(tasksByDate);
           done = pruneDoneToExisting(tasksByDate, done);
           planVersion = CURRENT_PLAN_VERSION;
         }
@@ -1547,6 +1619,7 @@
           tasksByDate,
           done,
           planVersion,
+          recoveredFromV1: true,
           errors: data.errors || [],
           simScores: data.simScores || {},
           iaveDone: data.iaveDone || {},
@@ -1971,14 +2044,16 @@
   }
 
   // init
-  if (state.planUpdated) {
-    delete state.planUpdated;
+  if (state.notice) {
+    const msg =
+      state.notice === "recovered"
+        ? "Recuperei tarefas tuas a partir de uma cópia antiga neste browser. Confirma se está tudo."
+        : "Plano oficial atualizado. As tarefas que tu adicionaste mantêm-se.";
+    delete state.notice;
     saveState();
-    setTimeout(() => {
-      alert(
-        "O calendário de estudo foi atualizado para a versão nova (sem Auto da Barca, FQ alinhado). Tarefas pessoais, erros e IAVE mantêm-se.",
-      );
-    }, 300);
+    setTimeout(() => alert(msg), 300);
+  } else {
+    saveState();
   }
   fillSelects();
   document.querySelectorAll(".view-btn").forEach((b) => {

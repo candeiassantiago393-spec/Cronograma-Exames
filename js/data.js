@@ -1,7 +1,7 @@
 /* Auto-generated schedule data — Cronograma Exames */
 window.CRONOGRAMA_DATA = {
   "week1Start": "2026-10-05",
-  "planVersion": 3,
+  "planVersion": 4,
   "typeLabels": {
     "estudo": "Estudo / teoria",
     "exercicios": "Exercícios",
