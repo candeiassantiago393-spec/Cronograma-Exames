@@ -98,6 +98,7 @@
     btnDeleteIave: document.getElementById("btn-delete-iave"),
     personalList: document.getElementById("personal-list"),
     personalCatFilters: document.getElementById("personal-cat-filters"),
+    storageBanner: document.getElementById("storage-banner"),
   };
 
   let editingIaveId = null;
@@ -1555,39 +1556,100 @@
     renderAll();
   }
 
+  function buildBackupPayload() {
+    return {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      data: {
+        tasksByDate: state.tasksByDate,
+        done: state.done,
+        errors: state.errors,
+        simScores: state.simScores,
+        iaveDone: state.iaveDone,
+        customSubjects: state.customSubjects || [],
+        subjectColors: state.subjectColors || {},
+        iaveCustom: state.iaveCustom || [],
+        iaveOverrides: state.iaveOverrides || {},
+        personalCategories: state.personalCategories || [],
+        planVersion: state.planVersion || CURRENT_PLAN_VERSION,
+        recoveredFromV1: true,
+      },
+    };
+  }
+
   function exportBackup() {
-    const blob = new Blob(
-      [
-        JSON.stringify(
-          {
-            version: 2,
-            exportedAt: new Date().toISOString(),
-            data: {
-              tasksByDate: state.tasksByDate,
-              done: state.done,
-              errors: state.errors,
-              simScores: state.simScores,
-              iaveDone: state.iaveDone,
-              customSubjects: state.customSubjects || [],
-              subjectColors: state.subjectColors || {},
-              iaveCustom: state.iaveCustom || [],
-              iaveOverrides: state.iaveOverrides || {},
-              personalCategories: state.personalCategories || [],
-              planVersion: state.planVersion || CURRENT_PLAN_VERSION,
-            },
-          },
-          null,
-          2,
-        ),
-      ],
-      { type: "application/json" },
-    );
+    const blob = new Blob([JSON.stringify(buildBackupPayload(), null, 2)], {
+      type: "application/json",
+    });
     const link = document.createElement("a");
     const stamp = new Date().toISOString().slice(0, 10);
     link.download = `cronograma-exames-backup-${stamp}.json`;
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
+  }
+
+  function countUserTasks() {
+    let n = 0;
+    for (const list of Object.values(state.tasksByDate || {})) {
+      for (const t of list || []) if (isUserTask(t)) n += 1;
+    }
+    return n;
+  }
+
+  function hasLocalCustomizations() {
+    return (
+      countUserTasks() > 0 ||
+      (state.customSubjects || []).length > 0 ||
+      Object.keys(state.subjectColors || {}).length > 0 ||
+      Object.keys(state.done || {}).length > 0
+    );
+  }
+
+  function renderStorageBanner() {
+    const box = els.storageBanner;
+    if (!box) return;
+    const dismissed = localStorage.getItem("cronograma-storage-tip") === "1";
+    const isFile = location.protocol === "file:";
+    const isOnline = location.protocol === "http:" || location.protocol === "https:";
+    const customized = hasLocalCustomizations();
+
+    let html = "";
+    if (isFile && customized) {
+      html = `
+        <p><strong>Estás no ficheiro local.</strong> As tuas cores, tarefas e progresso ficam só nesta aba.
+        Para teres a mesma versão no telemóvel/GitHub: clica <strong>Backup</strong> aqui → abre
+        <em>candeiassantiago393-spec.github.io/Cronograma-Exames</em> → <strong>Restaurar</strong> com o ficheiro.</p>
+        <div class="banner-actions">
+          <button type="button" class="btn primary small" data-banner-backup>Backup agora</button>
+          <button type="button" class="btn ghost small" data-banner-dismiss>Entendi</button>
+        </div>`;
+    } else if (isOnline && !customized && !dismissed) {
+      html = `
+        <p><strong>Começar do zero neste link?</strong> Se já tinhas o calendário no ficheiro local (ou noutro browser)
+        com tarefas e cores tuas, faz <strong>Backup</strong> lá e depois <strong>Restaurar</strong> aqui.
+        Neste endereço as alterações também ficam guardadas automaticamente.</p>
+        <div class="banner-actions">
+          <button type="button" class="btn primary small" data-banner-restore>Restaurar backup</button>
+          <button type="button" class="btn ghost small" data-banner-dismiss>Já está</button>
+        </div>`;
+    }
+
+    if (!html) {
+      box.classList.add("hidden");
+      box.innerHTML = "";
+      return;
+    }
+    box.classList.remove("hidden");
+    box.innerHTML = html;
+    box.querySelector("[data-banner-backup]")?.addEventListener("click", exportBackup);
+    box.querySelector("[data-banner-restore]")?.addEventListener("click", () => {
+      document.getElementById("restore-file")?.click();
+    });
+    box.querySelector("[data-banner-dismiss]")?.addEventListener("click", () => {
+      localStorage.setItem("cronograma-storage-tip", "1");
+      box.classList.add("hidden");
+    });
   }
 
   function importBackupFile(file) {
@@ -1631,11 +1693,12 @@
         };
         discFilter = new Set(allDisciplineIds());
         personalCatFilter = "ALL";
+        localStorage.setItem("cronograma-storage-tip", "1");
         saveState();
         fillSelects();
         renderAll();
         if (selectedDate) openDay(selectedDate);
-        alert("Backup restaurado com sucesso.");
+        alert("Backup restaurado com sucesso. A partir de agora usa só este link — as alterações guardam-se aqui.");
       } catch (err) {
         console.error(err);
         alert("Não foi possível ler o ficheiro de backup.");
@@ -1920,6 +1983,7 @@
   function renderAll() {
     renderLegend();
     renderCalendar();
+    renderStorageBanner();
     if (activeTab === "personal") renderPersonalPanel();
     if (activeTab === "errors") renderErrors();
     if (activeTab === "sims") renderSims();
