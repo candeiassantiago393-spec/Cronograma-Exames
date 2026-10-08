@@ -692,6 +692,7 @@ prep = [
 
 out = {
     "week1Start": "2026-10-05",
+    "planVersion": 3,
     "typeLabels": TYPE_LABELS,
     "disciplineLabels": DISC_LABELS,
     "prepDays": prep,

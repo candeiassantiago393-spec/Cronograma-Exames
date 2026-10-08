@@ -178,6 +178,8 @@
     return `${prefix}_${Math.random().toString(36).slice(2, 9)}_${Date.now().toString(36)}`;
   }
 
+  const CURRENT_PLAN_VERSION = DATA.planVersion || 1;
+
   function buildDefaultTasks() {
     const map = {};
     for (const prep of DATA.prepDays) {
@@ -201,6 +203,30 @@
       }
     }
     return map;
+  }
+
+  /** Novo plano de estudo + mantém só tarefas pessoais do plano antigo. */
+  function mergePlanKeepingPersonal(oldMap) {
+    const next = buildDefaultTasks();
+    for (const [iso, list] of Object.entries(oldMap || {})) {
+      const personal = (list || []).filter((t) => isPersonal(t));
+      if (!personal.length) continue;
+      if (!next[iso]) next[iso] = [];
+      next[iso].push(...personal);
+    }
+    return next;
+  }
+
+  function pruneDoneToExisting(tasksByDate, done) {
+    const ids = new Set();
+    for (const list of Object.values(tasksByDate || {})) {
+      for (const t of list || []) ids.add(t.id);
+    }
+    const next = {};
+    for (const [id, val] of Object.entries(done || {})) {
+      if (ids.has(id)) next[id] = val;
+    }
+    return next;
   }
 
   function emptyStateExtras() {
@@ -254,16 +280,34 @@
     try {
       const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("cronograma-exames-v1");
       if (!raw) {
-        return { tasksByDate: buildDefaultTasks(), done: {}, ...emptyStateExtras() };
+        return {
+          tasksByDate: buildDefaultTasks(),
+          done: {},
+          planVersion: CURRENT_PLAN_VERSION,
+          ...emptyStateExtras(),
+        };
       }
       const parsed = JSON.parse(raw);
-      const tasksByDate =
+      let tasksByDate =
         parsed.tasksByDate && Object.keys(parsed.tasksByDate).length
           ? stripBarcaFromPlan(stripDescansoFromPlan(parsed.tasksByDate))
           : buildDefaultTasks();
+      let done = parsed.done || {};
+      let planVersion = parsed.planVersion || 0;
+      let planUpdated = false;
+
+      if (planVersion < CURRENT_PLAN_VERSION) {
+        tasksByDate = mergePlanKeepingPersonal(tasksByDate);
+        done = pruneDoneToExisting(tasksByDate, done);
+        planVersion = CURRENT_PLAN_VERSION;
+        planUpdated = true;
+      }
+
       return {
         tasksByDate,
-        done: parsed.done || {},
+        done,
+        planVersion,
+        planUpdated,
         errors: parsed.errors || [],
         simScores: parsed.simScores || {},
         iaveDone: parsed.iaveDone || {},
@@ -274,7 +318,12 @@
         personalCategories: normalizePersonalCategories(parsed.personalCategories),
       };
     } catch {
-      return { tasksByDate: buildDefaultTasks(), done: {}, ...emptyStateExtras() };
+      return {
+        tasksByDate: buildDefaultTasks(),
+        done: {},
+        planVersion: CURRENT_PLAN_VERSION,
+        ...emptyStateExtras(),
+      };
     }
   }
 
@@ -284,6 +333,7 @@
       JSON.stringify({
         tasksByDate: state.tasksByDate,
         done: state.done,
+        planVersion: state.planVersion || CURRENT_PLAN_VERSION,
         errors: state.errors,
         simScores: state.simScores,
         iaveDone: state.iaveDone,
@@ -297,9 +347,10 @@
   }
 
   function resetToPlan() {
-    if (!confirm("Repor o plano original? Mantém Caderno de Erros, notas e IAVE.")) return;
-    state.tasksByDate = buildDefaultTasks();
-    state.done = {};
+    if (!confirm("Repor o plano original? Mantém Caderno de Erros, notas, IAVE e tarefas pessoais.")) return;
+    state.tasksByDate = mergePlanKeepingPersonal(state.tasksByDate);
+    state.done = pruneDoneToExisting(state.tasksByDate, state.done);
+    state.planVersion = CURRENT_PLAN_VERSION;
     saveState();
     renderAll();
     if (selectedDate) openDay(selectedDate);
@@ -1451,6 +1502,7 @@
               iaveCustom: state.iaveCustom || [],
               iaveOverrides: state.iaveOverrides || {},
               personalCategories: state.personalCategories || [],
+              planVersion: state.planVersion || CURRENT_PLAN_VERSION,
             },
           },
           null,
@@ -1484,9 +1536,18 @@
         ) {
           return;
         }
+        let tasksByDate = stripBarcaFromPlan(stripDescansoFromPlan(data.tasksByDate));
+        let done = data.done || {};
+        let planVersion = data.planVersion || 0;
+        if (planVersion < CURRENT_PLAN_VERSION) {
+          tasksByDate = mergePlanKeepingPersonal(tasksByDate);
+          done = pruneDoneToExisting(tasksByDate, done);
+          planVersion = CURRENT_PLAN_VERSION;
+        }
         state = {
-          tasksByDate: stripBarcaFromPlan(stripDescansoFromPlan(data.tasksByDate)),
-          done: data.done || {},
+          tasksByDate,
+          done,
+          planVersion,
           errors: data.errors || [],
           simScores: data.simScores || {},
           iaveDone: data.iaveDone || {},
@@ -1911,6 +1972,15 @@
   }
 
   // init
+  if (state.planUpdated) {
+    delete state.planUpdated;
+    saveState();
+    setTimeout(() => {
+      alert(
+        "O calendário de estudo foi atualizado para a versão nova (sem Auto da Barca, FQ alinhado). Tarefas pessoais, erros e IAVE mantêm-se.",
+      );
+    }, 300);
+  }
   fillSelects();
   document.querySelectorAll(".view-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.view === viewMode);
